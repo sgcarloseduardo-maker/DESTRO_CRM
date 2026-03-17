@@ -260,6 +260,7 @@ def desenhar_placeholder(bg_img, x1, y1, x2, y2):
     draw.multiline_text((cx - w//2, cy - h//2), texto,
                         fill="red", font=fonte, align="center")
 
+
 # ==========================================
 # MOTOR DINÂMICO DE ENCARTES (DPI INTELIGENTE)
 # ==========================================
@@ -517,6 +518,8 @@ def acionar_gerador_grade(df_produtos, fundo_path, n_layout):
 # ==========================================
 # 2. GERADOR ARTES INDIVIDUAIS
 # ==========================================
+
+
 def acionar_gerador_individual(df_produtos, fundo_path):
     st.toast("🎨 Gerando Artes Individuais...", icon="⏳")
     base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -686,6 +689,8 @@ def acionar_gerador_individual(df_produtos, fundo_path):
 # ==========================================
 # 3. GERADOR PDF COM PLANILHA
 # ==========================================
+
+
 def gerar_pdf_planilha(df_produtos):
     st.toast("📄 Gerando PDF...", icon="⏳")
     img_idx = obter_indice_imagens()
@@ -765,10 +770,11 @@ def gerar_pdf_planilha(df_produtos):
     st.success(f"✅ PDF gerado com sucesso! ({len(df_produtos)} produtos)")
     return buffer
 
-
 # ==========================================
 # CARREGAMENTO DOS DADOS EXCEL (PASTA INTELIGENTE)
 # ==========================================
+
+
 def limpar_industria(val):
     val_str = str(val)
     match = re.search(r'\"(.*?)\"', val_str)
@@ -788,42 +794,43 @@ def manter_categoria_completa(txt):
 @st.cache_data
 def carregar_dados():
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    
-    # 🎯 CORREÇÃO NUVEM 1: Em vez de adivinhar o mais recente, dizemos o arquivo exato que vai usar:
     caminho_planilha = os.path.join(base_dir, "Programa_Destro-04-03.xlsx")
 
     if not os.path.exists(caminho_planilha):
-        st.error(f"🚨 PLANILHA NÃO ENCONTRADA: O sistema não achou '{caminho_planilha}'. Verifique o nome do arquivo no GitHub.")
-        return pd.DataFrame()
+        st.error(
+            f"🚨 PLANILHA NÃO ENCONTRADA: O sistema não achou '{caminho_planilha}'. Verifique o nome do arquivo no GitHub.")
+        return pd.DataFrame(), []
 
     # LÊ A ABA "Curva ABC_Semanal" OFICIAL DA PLANILHA
     try:
-        df_abc = pd.read_excel(caminho_planilha, sheet_name="Curva ABC_Semanal", header=None)
-        mask_tante = df_abc[1].astype(str).str.contains("TANTE: 999 - Geral da Empresa", na=False)
+        df_abc = pd.read_excel(
+            caminho_planilha, sheet_name="Curva ABC_Semanal", header=None, engine='openpyxl')
+
+        col_b = df_abc[1].astype(str)
+        mask_tante = col_b.str.contains("TANTE: 999", na=False)
         idx_tante = df_abc.index[mask_tante]
         curva_abc_codigos = []
 
         if len(idx_tante) > 0:
-            linha_inicio = idx_tante[0] + 2  
+            linha_inicio = idx_tante[0] + 2
             for i in range(linha_inicio, len(df_abc)):
-                val = str(df_abc.iloc[i, 1])
-                if val.strip() == "" or val.strip().lower() == "nan":
+                val = str(df_abc.iloc[i, 1]).strip()
+                if (val == "" or val.lower() == "nan") and str(df_abc.iloc[i, 0]).strip().lower() in ["", "nan"]:
                     break
+
                 cod_val = str(df_abc.iloc[i, 0])
                 cod_limpo = re.sub(r"\D", "", cod_val.split("-")[0])
                 if cod_limpo:
                     curva_abc_codigos.append(cod_limpo)
         else:
             curva_abc_codigos = []
-    except Exception:
+    except Exception as e:
+        print(f"Erro ao ler Curva ABC: {e}")
         curva_abc_codigos = []
-        
-    # Salva na sessão para o botão automático usar a ordem
-    st.session_state['codigos_abc_planilha'] = curva_abc_codigos
 
     try:
-        df_ind = pd.read_excel(
-            caminho_planilha, sheet_name="Industrias", skiprows=1, header=None)
+        df_ind = pd.read_excel(caminho_planilha, sheet_name="Industrias",
+                               skiprows=1, header=None, engine='openpyxl')
         lista_industrias = sorted([i for i in df_ind[0].apply(
             limpar_industria).dropna().unique() if i != ''])
     except Exception:
@@ -831,7 +838,7 @@ def carregar_dados():
 
     try:
         df_marcas = pd.read_excel(
-            caminho_planilha, sheet_name="Marcas", skiprows=1, header=None)
+            caminho_planilha, sheet_name="Marcas", skiprows=1, header=None, engine='openpyxl')
         lista_marcas_reais = sorted([m.strip() for m in df_marcas[0].dropna().astype(
             str) if m.strip().lower() != 'nan' and m.strip() != ''])
     except Exception:
@@ -847,7 +854,8 @@ def carregar_dados():
         return 'Outra Marca'
 
     try:
-        df_bateu = pd.read_excel(caminho_planilha, sheet_name="BateuLevou")
+        df_bateu = pd.read_excel(
+            caminho_planilha, sheet_name="BateuLevou", engine='openpyxl')
         df_bateu['Desc_Norm'] = df_bateu['DESCRICAO'].astype(
             str).apply(lambda x: re.sub(r'\s+', ' ', x.strip().upper()))
         dict_bateu_ind = df_bateu.set_index(
@@ -859,10 +867,9 @@ def carregar_dados():
         dict_bateu_ind, dict_bateu_mar, descricoes_bateu = {}, {}, set()
 
     try:
-        df = pd.read_excel(
-            caminho_planilha, sheet_name="Banco_Dados_Semanal", skiprows=5, header=None)
+        df = pd.read_excel(caminho_planilha, sheet_name="Banco_Dados_Semanal",
+                           skiprows=5, header=None, engine='openpyxl')
 
-        # SALVA COLUNA B ORIGINAL
         coluna_b_original = df[1].copy()
 
         cat_raw = df[1].astype(str)
@@ -903,8 +910,8 @@ def carregar_dados():
         df['Fator_Anterior'] = np.random.choice(
             [1.0, 1.05, 1.15, 0.95], size=len(df), p=[0.5, 0.2, 0.1, 0.2])
 
-        # COLUNA CURVA ABC ATUALIZADA
         curva_abc_set = set(curva_abc_codigos)
+
         def eh_curva_abc(cod):
             num = re.sub(r"\D", "", str(cod).split("-")[0])
             return num in curva_abc_set
@@ -939,15 +946,11 @@ def carregar_dados():
 
         df['Meta_Mensal'] = df.apply(checar_meta_mensal, axis=1)
 
-        # ==============================================================
-        # 🟢 INTELIGÊNCIA CAMPANHA TO PODENDO - FILTRO ARRASTÃO
-        # ==============================================================
-        codigos_podendo_exatos = set()
-        codigos_podendo_parciais = set()
-
+        # TO PODENDO
+        codigos_podendo_exatos, codigos_podendo_parciais = set(), set()
         try:
             df_podendo = pd.read_excel(
-                caminho_planilha, sheet_name="TO PODENDO", header=None)
+                caminho_planilha, sheet_name="TO PODENDO", header=None, engine='openpyxl')
             for col in df_podendo.columns:
                 for val in df_podendo[col].dropna():
                     val_str = str(val).strip().upper()
@@ -965,25 +968,19 @@ def carregar_dados():
         def cruzar_ean_podendo(idx):
             val_b = re.sub(r'\D', '', str(coluna_b_original.get(idx, "")))
             val_a = re.sub(r'\D', '', str(df.at[idx, 'Código']))
-
             if val_b and val_b in codigos_podendo_exatos:
                 return True
             if val_a and val_a in codigos_podendo_exatos:
                 return True
-
             for parcial in codigos_podendo_parciais:
                 if val_b and val_b.startswith(parcial):
                     return True
                 if val_a and val_a.startswith(parcial):
                     return True
-
             return False
 
         df['Camp_ToPodendo'] = [cruzar_ean_podendo(idx) for idx in df.index]
-
-        # SISTEMA BOTE SALVA-VIDAS TO PODENDO
         if not df['Camp_ToPodendo'].any():
-            # Adicione outras marcas chave se quiser
             marcas_podendo = ['KINDER', 'MAGGI', 'GAROTO',
                               'NESTLE', 'SUFRESH', 'TODDY', 'NESCAU']
 
@@ -994,19 +991,14 @@ def carregar_dados():
                 return False
             df['Camp_ToPodendo'] = df['Desc_Norm'].apply(fallback_podendo)
 
-        # ==============================================================
-        # 🦷 INTELIGÊNCIA CAMPANHA COLGATE - O FILTRO ARRASTÃO
-        # ==============================================================
-        codigos_colgate_exatos = set()
-        codigos_colgate_parciais = set()
-
+        # COLGATE
+        codigos_colgate_exatos, codigos_colgate_parciais = set(), set()
         try:
             df_colgate = pd.read_excel(
-                caminho_planilha, sheet_name="COLGATE", header=None)
+                caminho_planilha, sheet_name="COLGATE", header=None, engine='openpyxl')
             for col in df_colgate.columns:
                 for val in df_colgate[col].dropna():
                     val_str = str(val).strip().upper()
-
                     if 'E+' in val_str:
                         raiz = re.sub(r'\D', '', val_str.split('E')[0])
                         if len(raiz) >= 4:
@@ -1021,23 +1013,18 @@ def carregar_dados():
         def cruzar_ean_colgate(idx):
             val_b = re.sub(r'\D', '', str(coluna_b_original.get(idx, "")))
             val_a = re.sub(r'\D', '', str(df.at[idx, 'Código']))
-
             if val_b and val_b in codigos_colgate_exatos:
                 return True
             if val_a and val_a in codigos_colgate_exatos:
                 return True
-
             for parcial in codigos_colgate_parciais:
                 if val_b and val_b.startswith(parcial):
                     return True
                 if val_a and val_a.startswith(parcial):
                     return True
-
             return False
 
         df['Camp_Colgate'] = [cruzar_ean_colgate(idx) for idx in df.index]
-
-        # SISTEMA BOTE SALVA-VIDAS COLGATE
         if not df['Camp_Colgate'].any():
             marcas_colgate = ['COLGATE', 'SORRISO',
                               'PROTEX', 'PALMOLIVE', 'AJAX', 'PINHO SOL']
@@ -1053,10 +1040,19 @@ def carregar_dados():
         st.error(f"Erro ao carregar Excel: {e}")
         df = pd.DataFrame()
 
-    return df
+    return df, curva_abc_codigos
 
 
-df_raw = carregar_dados()
+# ==============================================================
+# CARREGAMENTO SEGURO DA SESSÃO
+# ==============================================================
+try:
+    df_raw, lista_abc = carregar_dados()
+except ValueError:
+    st.cache_data.clear()
+    df_raw, lista_abc = carregar_dados()
+
+st.session_state['codigos_abc_planilha'] = lista_abc
 
 
 def atualizar_prazo():
@@ -1224,7 +1220,7 @@ with tab1:
 
     st.markdown("<p class='titulo-secao'>🤖 Geradores Automáticos (20 Espaços)</p>",
                 unsafe_allow_html=True)
-    
+
     cg1, cg2, cg3, cg4 = st.columns(4)
 
     with cg1:
@@ -1263,11 +1259,12 @@ with tab1:
             st.session_state['produtos_selecionados'] = []
             st.session_state['num_produtos_layout'] = 20
             faltantes = []
-            codigos_para_adicionar = st.session_state.get('codigos_abc_planilha', [])
-            
+            codigos_para_adicionar = st.session_state.get(
+                'codigos_abc_planilha', [])
+
             for cod in codigos_para_adicionar:
-                # busca direto na base do banco de dados
-                df_match = df_app[df_app['Código'].apply(lambda x: re.sub(r"\D", "", str(x).split("-")[0])) == cod]
+                df_match = df_app[df_app['Código'].apply(
+                    lambda x: re.sub(r"\D", "", str(x).split("-")[0])) == cod]
                 if df_match.empty:
                     faltantes.append(cod)
                 else:
@@ -1279,9 +1276,10 @@ with tab1:
                             'Comissão': 0.0, 'FLEX': 0.0, 'DESC': 0.0, 'Imposto': False,
                             'Preço Final': float(r['Preço Atual']), 'ST_Flag': r.get('ST_Flag', '')
                         })
-            
+
             if faltantes:
-                st.warning(f"⚠️ {len(faltantes)} produto(s) da Curva ABC não foram encontrados na aba Banco_Dados_Semanal: {', '.join(faltantes[:10])}{'...' if len(faltantes)>10 else ''}")
+                st.warning(
+                    f"⚠️ {len(faltantes)} produto(s) da Curva ABC não foram encontrados na aba Banco_Dados_Semanal.")
             st.rerun()
 
     st.markdown("---")
@@ -1453,26 +1451,29 @@ with tab1:
     with col_central:
         opt_grade = st.session_state.get("sel_grade", "Layout 1")
         n_layout = st.session_state.get('num_produtos_layout', 0)
-        
+
         btn1, btn2, btn3 = st.columns(3)
 
         with btn1:
             if st.button("🚀 GERAR TABLOIDE (GRADE)", type="primary", use_container_width=True):
                 if n_layout == 0:
-                    st.error("⚠️ Para gerar um tabloide em grade, escolha um layout fixo (9, 12, 16 ou 20) no menu lateral.")
+                    st.error(
+                        "⚠️ Para gerar um tabloide em grade, escolha um layout fixo (9, 12, 16 ou 20) no menu lateral.")
                 else:
-                    st.session_state['galeria_individuais'], st.session_state['pdf_buffer_pronto'] = [], None
-                    df_final = pd.DataFrame(st.session_state['produtos_selecionados'])
+                    st.session_state['galeria_individuais'], st.session_state['pdf_buffer_pronto'] = [
+                    ], None
+                    df_final = pd.DataFrame(
+                        st.session_state['produtos_selecionados'])
                     if not df_final.empty:
                         df_final = df_final[df_final['Levar'] == True]
 
                     if df_final.empty:
                         st.error("⚠️ Você não deixou nenhum item marcado!")
                     else:
-                        padrao_fundo = LAYOUTS.get(n_layout, LAYOUTS[9])["bg_pattern"]
+                        padrao_fundo = LAYOUTS.get(n_layout, LAYOUTS[9])[
+                            "bg_pattern"]
                         num_versao = opt_grade.split()[-1]
-                        
-                        # CORREÇÃO NUVEM 2: Ajuste no nome do arquivo para aceitar os padrões exatos que o Windows montou
+
                         if "Modelo" in padrao_fundo:
                             fundo_grade_name = f"Modelo {n_layout} Espaços-{num_versao}.jpg"
                         else:
@@ -1483,22 +1484,25 @@ with tab1:
 
                         alertas = checar_imposto_st(df_final)
                         if alertas:
-                            st.session_state['confirmacao_st'], st.session_state['alertas_st'], st.session_state['df_pendente'], st.session_state['path_pendente'] = 'grade', alertas, df_final, f_path_grade
+                            st.session_state['confirmacao_st'], st.session_state['alertas_st'], st.session_state[
+                                'df_pendente'], st.session_state['path_pendente'] = 'grade', alertas, df_final, f_path_grade
                         else:
                             st.session_state['confirmacao_st'] = None
-                            acionar_gerador_grade(df_final, f_path_grade, n_layout)
+                            acionar_gerador_grade(
+                                df_final, f_path_grade, n_layout)
 
         with btn2:
             if st.button("📱 GERAR ARTES INDIVIDUAIS", type="secondary", use_container_width=True):
                 opt_indiv = st.session_state.get("sel_indiv", "Layout 1")
                 num_versao_indiv = opt_indiv.split()[-1]
-                
-                # CORREÇÃO NUVEM 3: Ajuste do nome exato do template individual 
+
                 base_dir = os.path.dirname(os.path.abspath(__file__))
-                f_path_indiv = os.path.join(base_dir, f"Modelo_arte_individual_{num_versao_indiv}.jpg")
+                f_path_indiv = os.path.join(
+                    base_dir, f"Modelo_arte_individual_{num_versao_indiv}.jpg")
 
                 st.session_state['pdf_buffer_pronto'] = None
-                df_final = pd.DataFrame(st.session_state['produtos_selecionados'])
+                df_final = pd.DataFrame(
+                    st.session_state['produtos_selecionados'])
                 if not df_final.empty:
                     df_final = df_final[df_final['Levar'] == True]
 
@@ -1507,15 +1511,18 @@ with tab1:
                 else:
                     alertas = checar_imposto_st(df_final)
                     if alertas:
-                        st.session_state['confirmacao_st'], st.session_state['alertas_st'], st.session_state['df_pendente'], st.session_state['path_pendente'] = 'indiv', alertas, df_final, f_path_indiv
+                        st.session_state['confirmacao_st'], st.session_state['alertas_st'], st.session_state[
+                            'df_pendente'], st.session_state['path_pendente'] = 'indiv', alertas, df_final, f_path_indiv
                     else:
                         st.session_state['confirmacao_st'] = None
-                        st.session_state['galeria_individuais'] = acionar_gerador_individual(df_final, f_path_indiv)
+                        st.session_state['galeria_individuais'] = acionar_gerador_individual(
+                            df_final, f_path_indiv)
 
         with btn3:
             if st.button("📄 GERAR PDF (PLANILHA)", type="secondary", use_container_width=True):
                 st.session_state['pdf_buffer_pronto'] = None
-                df_final = pd.DataFrame(st.session_state['produtos_selecionados'])
+                df_final = pd.DataFrame(
+                    st.session_state['produtos_selecionados'])
                 if not df_final.empty:
                     df_final = df_final[df_final['Levar'] == True]
 
@@ -1524,10 +1531,12 @@ with tab1:
                 else:
                     alertas = checar_imposto_st(df_final)
                     if alertas:
-                        st.session_state['confirmacao_st'], st.session_state['alertas_st'], st.session_state['df_pendente'] = 'pdf', alertas, df_final
+                        st.session_state['confirmacao_st'], st.session_state[
+                            'alertas_st'], st.session_state['df_pendente'] = 'pdf', alertas, df_final
                     else:
                         st.session_state['confirmacao_st'] = None
-                        st.session_state['pdf_buffer_pronto'] = gerar_pdf_planilha(df_final)
+                        st.session_state['pdf_buffer_pronto'] = gerar_pdf_planilha(
+                            df_final)
 
         if st.session_state['confirmacao_st'] is not None:
             st.markdown("<div style='background-color:#fff1f2; border-left:4px solid #e11d48; padding:15px; margin-top:15px; margin-bottom:15px; border-radius:4px; box-shadow: 0px 4px 6px rgba(225, 29, 72, 0.1);'><h4 style='color:#e11d48; margin-top:0;'>⚠️ Atenção: Imposto Não Aplicado</h4><p style='color:#4c0519; margin-bottom:10px;'>Os seguintes produtos constam como <b>SEM S.T (Calcular)</b>, mas a caixa de <b>Imposto (+10.1%)</b> não foi marcada:</p><ul style='color:#881337; margin-bottom:15px; font-weight:bold;'>" +
@@ -1539,11 +1548,14 @@ with tab1:
                     path_p = st.session_state.get('path_pendente', '')
                     st.session_state['confirmacao_st'] = None
                     if acao == 'grade':
-                        acionar_gerador_grade(df_p, path_p, st.session_state.get('num_produtos_layout', 9))
+                        acionar_gerador_grade(
+                            df_p, path_p, st.session_state.get('num_produtos_layout', 9))
                     elif acao == 'indiv':
-                        st.session_state['galeria_individuais'] = acionar_gerador_individual(df_p, path_p)
+                        st.session_state['galeria_individuais'] = acionar_gerador_individual(
+                            df_p, path_p)
                     elif acao == 'pdf':
-                        st.session_state['pdf_buffer_pronto'] = gerar_pdf_planilha(df_p)
+                        st.session_state['pdf_buffer_pronto'] = gerar_pdf_planilha(
+                            df_p)
             with c_nao:
                 if st.button("❌ NÃO, CANCELAR E ARRUMAR", type="secondary", use_container_width=True):
                     st.session_state['confirmacao_st'] = None
@@ -1564,34 +1576,38 @@ with tab1:
                 f"<div style='text-align:center; font-weight:bold; color:#1E293B; margin-bottom:8px;'>Layout do Tabloide ({texto_layout})</div>", unsafe_allow_html=True)
             st.selectbox("Versão Tabloide", [
                          "Layout 1", "Layout 2", "Layout 3", "Layout 4"], key="sel_grade", label_visibility="collapsed")
-            
+
             if n_layout != 0:
                 opt_g = st.session_state.get("sel_grade", "Layout 1")
                 num_v_g = opt_g.split()[-1]
-                
+
                 if n_layout == 9:
                     nome_fundo_grade = f"FUNDO-BASE-USADO-NA-AUTOMACAO-{num_v_g}.jpg"
                 else:
                     nome_fundo_grade = f"Modelo {n_layout} Espaços-{num_v_g}.jpg"
-                
-                f_path_g = os.path.join(os.path.dirname(os.path.abspath(__file__)), nome_fundo_grade)
+
+                f_path_g = os.path.join(os.path.dirname(
+                    os.path.abspath(__file__)), nome_fundo_grade)
                 if os.path.exists(f_path_g):
                     st.image(f_path_g, use_container_width=True)
                 else:
-                    st.warning(f"⚠️ Imagem '{nome_fundo_grade}' não encontrada.")
+                    st.warning(
+                        f"⚠️ Imagem '{nome_fundo_grade}' não encontrada.")
             else:
-                st.info("⚠️ Sem limite não gera tabloide em grade. Apenas artes individuais ou PDF.")
+                st.info(
+                    "⚠️ Sem limite não gera tabloide em grade. Apenas artes individuais ou PDF.")
 
         with c_prev2:
             st.markdown(
                 "<div style='text-align:center; font-weight:bold; color:#1E293B; margin-bottom:8px;'>Arte Individual</div>", unsafe_allow_html=True)
             st.selectbox("Versão Individual", [
                          "Layout 1", "Layout 2", "Layout 3", "Layout 4"], key="sel_indiv", label_visibility="collapsed")
-            
+
             opt_i = st.session_state.get("sel_indiv", "Layout 1")
             nome_fundo_indiv = f"Modelo_arte_individual_{opt_i.split()[-1]}.jpg"
-            f_path_i = os.path.join(os.path.dirname(os.path.abspath(__file__)), nome_fundo_indiv)
-            
+            f_path_i = os.path.join(os.path.dirname(
+                os.path.abspath(__file__)), nome_fundo_indiv)
+
             if os.path.exists(f_path_i):
                 st.image(f_path_i, use_container_width=True)
             else:
