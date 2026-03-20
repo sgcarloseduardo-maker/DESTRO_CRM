@@ -21,10 +21,9 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# CSS para padronizar o tamanho das imagens na grade de produtos e centralização na lista
+# CSS para layout do carrinho super compacto e centralizado
 st.markdown("""
 <style>
-    /* CSS da grade de produtos (vitrine) */
     div[data-testid="stImage"] img {
         object-fit: contain;
         height: 180px;
@@ -32,25 +31,59 @@ st.markdown("""
         background-color: white;
     }
     
-    /* CSS específico para as miniaturas do carrinho para forçar altura fixa e menor */
+    /* Remove padding interno das colunas do streamlit na parte do carrinho para colar os elementos */
+    .compact-row div[data-testid="column"] {
+        padding: 0px !important;
+        margin: 0px !important;
+    }
+    
+    /* Configuração da miniatura com altura mínima */
     .carrinho-img img {
         object-fit: contain !important;
-        height: 35px !important;
-        width: 35px !important;
+        height: 25px !important;
+        width: 25px !important;
     }
     
-    /* Centralização vertical dos textos no carrinho */
+    /* Centralização horizontal e vertical de todos os textos com altura espremida */
     .carrinho-texto {
         display: flex;
-        align-items: center;
-        height: 35px;
+        justify-content: center; /* Centraliza horizontalmente */
+        align-items: center;     /* Centraliza verticalmente */
+        height: 25px;            /* Altura mínima acompanhando a foto */
         font-size: 13px;
+        font-weight: bold;       /* Coloca em negrito conforme solicitado */
+        margin: 0;
+        padding: 0;
     }
     
+    /* Centraliza o botão dentro da sua div */
+    .carrinho-btn {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 25px;
+    }
+    
+    /* Espreme o botão padrão do streamlit no carrinho */
+    .carrinho-btn button {
+        min-height: 20px !important;
+        height: 20px !important;
+        padding: 0px 8px !important;
+        line-height: 1 !important;
+        font-size: 10px !important;
+        margin: 0 !important;
+    }
+
+    /* Linha divisória bem grudada */
     .linha-separadora {
-        margin: 5px 0px 5px 0px; 
+        margin: 2px 0px 2px 0px !important; 
         border: 0; 
-        border-top: 2px solid #94a3b8; /* Linha mais espessa e mais escura */
+        border-top: 2px solid #94a3b8;
+    }
+    
+    /* Remove espaço extra do markdown vazio (botões) */
+    p {
+        margin-bottom: 0 !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -112,7 +145,6 @@ def mapear_sinonimos(desc):
     desc_up = desc.upper()
     sinonimos = []
 
-    # Mapeamentos comuns baseados em abreviações do atacado
     if 'P HIG' in desc_up or 'PAPEL HIG' in desc_up or 'P.HIG' in desc_up:
         sinonimos.append('PAPEL HIGIÊNICO')
     if 'LIMP VD' in desc_up or 'LIMP.VD' in desc_up:
@@ -151,7 +183,6 @@ def mapear_sinonimos(desc):
         sinonimos.append('ÁGUA SANITÁRIA CÂNDIDA')
 
     if sinonimos:
-        # Adiciona o sinônimo discretamente entre colchetes para o motor de busca achar
         return desc + " [" + ", ".join(sinonimos) + "]"
     return desc
 
@@ -301,8 +332,8 @@ def gerar_pdf_pedido(produtos_selecionados):
     title = Paragraph("<b>Meu Pedido de Produtos</b>", styles['Title'])
     elements.append(title)
 
-    # Adicionando a Data atual no topo
-    data_atual = datetime.now().strftime("%d/%m/%Y às %H:%M")
+    # DATA APENAS (Sem horário)
+    data_atual = datetime.now().strftime("%d/%m/%Y")
     elements.append(
         Paragraph(f"<b>Data do Pedido:</b> {data_atual}", styles['Normal']))
     elements.append(Spacer(1, 15))
@@ -428,7 +459,6 @@ st.title("Catálogo de Produtos")
 st.markdown("<h3>Selecionar Produtos Manualmente</h3>", unsafe_allow_html=True)
 
 if not df_filtrado.empty:
-    # Cria uma coluna virtual com a sintaxe: "Código - Descrição [Sinônimos]"
     df_filtrado['Opcao_Busca'] = df_filtrado.apply(
         lambda x: f"{x['Código']} - {mapear_sinonimos(x['Descrição'])}", axis=1)
 
@@ -442,7 +472,6 @@ if not df_filtrado.empty:
                 'Descrição': row['Descrição'],
                 'ImgPath': img_idx_global.get(normalizar_codigo_imagem(cod))
             }
-            # Limpa o selectbox
             st.session_state.busca_manual = None
 
     st.selectbox(
@@ -535,34 +564,40 @@ else:
     st.warning("Nenhum produto encontrado com os filtros selecionados.")
 
 # ==========================================
-# LISTA DE PRODUTOS SELECIONADOS
+# LISTA DE PRODUTOS SELECIONADOS - VISUAL LIMPO E COMPACTO
 # ==========================================
 st.divider()
 st.header("📋 Produtos no seu Carrinho")
 
 if len(st.session_state['carrinho']) > 0:
 
-    # Cabeçalho
-    c1, c2, c3, c4 = st.columns([1, 2, 6, 1])
-    c1.markdown("**Foto**")
-    c2.markdown("**Código**")
-    c3.markdown("**Descrição**")
-    c4.markdown("**Remover**")
-    st.markdown("<hr class='linha-separadora'>", unsafe_allow_html=True)
+    # Cabeçalho Centralizado
+    st.markdown("""
+        <div style='display: flex; font-weight: bold; margin-bottom: 5px; font-size: 14px;'>
+            <div style='width: 10%; text-align: center;'>Foto</div>
+            <div style='width: 20%; text-align: center;'>Código</div>
+            <div style='width: 60%; text-align: center;'>Descrição</div>
+            <div style='width: 10%; text-align: center;'>Remover</div>
+        </div>
+        <hr class='linha-separadora'>
+    """, unsafe_allow_html=True)
+
+    # Criação de um container com uma classe especial para remover o padding das colunas nativas
+    st.markdown('<div class="compact-row">', unsafe_allow_html=True)
 
     for cod, prod in list(st.session_state['carrinho'].items()):
-        c1, c2, c3, c4 = st.columns([1, 2, 6, 1], gap="small")
+        c1, c2, c3, c4 = st.columns([1, 2, 6, 1])
 
         with c1:
             img_path = prod.get('ImgPath')
             if img_path and os.path.exists(img_path):
-                st.markdown(f"<div class='carrinho-img'>",
-                            unsafe_allow_html=True)
+                st.markdown(
+                    f"<div class='carrinho-img' style='display:flex; justify-content:center;'>", unsafe_allow_html=True)
                 st.image(img_path)
                 st.markdown("</div>", unsafe_allow_html=True)
             else:
                 st.markdown(
-                    "<div class='carrinho-texto' style='color: gray; font-size: 11px;'>Sem foto</div>", unsafe_allow_html=True)
+                    "<div class='carrinho-texto' style='color: gray; font-size: 11px; font-weight: normal;'>Sem foto</div>", unsafe_allow_html=True)
 
         with c2:
             st.markdown(
@@ -573,24 +608,33 @@ if len(st.session_state['carrinho']) > 0:
                 f"<div class='carrinho-texto'>{prod['Descrição']}</div>", unsafe_allow_html=True)
 
         with c4:
-            st.markdown("<div style='margin-top: 5px;'>",
-                        unsafe_allow_html=True)
+            st.markdown("<div class='carrinho-btn'>", unsafe_allow_html=True)
             if st.button("❌", key=f"lista_rem_{cod}", help="Remover produto"):
                 del st.session_state['carrinho'][cod]
                 st.rerun()
             st.markdown("</div>", unsafe_allow_html=True)
 
-        # Linha separadora entre itens, mais marcante
+        # Linha separadora logo abaixo de cada item
         st.markdown("<hr class='linha-separadora'>", unsafe_allow_html=True)
 
-    # Botão Extra de Download no Fim da Lista
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # BOTOES NO FINAL (Baixar PDF e Limpar Carrinho)
     st.markdown("<br>", unsafe_allow_html=True)
-    c_espaco, c_botao, c_espaco2 = st.columns([3, 2, 3])
-    with c_botao:
+
+    # Organiza os botões lado a lado centralizados
+    c_espaco1, btn_limpar, btn_baixar, c_espaco2 = st.columns([2, 2, 2, 2])
+
+    with btn_limpar:
+        if st.button("🗑️ Limpar Carrinho", key="botao_limpar_rodape", use_container_width=True):
+            st.session_state['carrinho'] = {}
+            st.rerun()
+
+    with btn_baixar:
         pdf_buffer_fim = gerar_pdf_pedido(
             list(st.session_state['carrinho'].values()))
         st.download_button(
-            label="📥 BAIXAR PDF DO PEDIDO",
+            label="📥 Baixar PDF",
             data=pdf_buffer_fim,
             file_name="Meu_Pedido.pdf",
             mime="application/pdf",
