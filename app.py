@@ -16,6 +16,8 @@ from reportlab.lib import colors
 from reportlab.lib.units import inch
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
 from io import BytesIO
+from reportlab.lib.utils import ImageReader
+from reportlab.pdfgen import canvas as pdfcanvas
 
 # ==========================================
 # CONFIGURAÇÃO DA PÁGINA
@@ -199,6 +201,34 @@ def obter_indice_imagens():
                 if num:
                     idx[num] = os.path.join(root, fn)
     return idx
+
+
+def salvar_imagem_upload(uploaded_file, codigo_produto):
+    if uploaded_file is not None:
+        # Define o caminho para a pasta Base de Imagens
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        pasta_imagens = os.path.join(base_dir, "Base de Imagens")
+
+        # Cria a pasta se ela não existir
+        os.makedirs(pasta_imagens, exist_ok=True)
+
+        # Pega a extensão original do arquivo (ex: .jpg, .png)
+        extensao = os.path.splitext(uploaded_file.name)[1].lower()
+        if not extensao:
+            extensao = ".jpg"  # fallback seguro
+
+        # Define o caminho do novo arquivo usando o código do produto
+        caminho_salvar = os.path.join(
+            pasta_imagens, f"{codigo_produto}{extensao}")
+
+        # Salva o arquivo fisicamente
+        with open(caminho_salvar, "wb") as f:
+            f.write(uploaded_file.getbuffer())
+
+        # Limpa o cache para forçar a função obter_indice_imagens() a ler a nova imagem
+        st.cache_data.clear()
+        return True
+    return False
 
 
 def image_to_base64(img_path):
@@ -692,22 +722,117 @@ def acionar_gerador_individual(df_produtos, fundo_path):
 
 
 def gerar_pdf_planilha(df_produtos):
-    st.toast("📄 Gerando PDF...", icon="⏳")
+    st.toast("📄 Gerando PDF interativo...", icon="⏳")
     img_idx = obter_indice_imagens()
     buffer = BytesIO()
-    pdf = SimpleDocTemplate(buffer, pagesize=landscape(
-        letter), topMargin=0.3*inch, bottomMargin=0.3*inch, leftMargin=0.3*inch, rightMargin=0.3*inch)
 
-    elementos = []
-    data = [["Foto", "Descrição", "Preço Final"]]
-    max_img_size = 0.8 * inch
+    page_width, page_height = landscape(letter)
+    c = pdfcanvas.Canvas(buffer, pagesize=(page_width, page_height))
+    form = c.acroForm
 
-    for _, row in df_produtos.iterrows():
+    margem_esq = 20
+    margem_dir = 20
+    margem_top = 20
+    margem_bottom = 20
+
+    largura_util = page_width - margem_esq - margem_dir
+    altura_util = page_height - margem_top - margem_bottom
+
+    titulo_h = 28
+    header_h = 24
+    row_h = 62
+
+    # --- LARGURAS RECONFIGURADAS E PRIORIZADAS ---
+    col_foto = 85
+    col_desc = 477
+    col_preco = 90
+    col_chk = 55
+    col_qtd = 45
+
+    x_foto = margem_esq
+    x_desc = x_foto + col_foto
+    x_preco = x_desc + col_desc
+    x_chk = x_preco + col_preco
+    x_qtd = x_chk + col_chk
+
+    rows_per_page = int((altura_util - titulo_h - header_h - 60) // row_h)
+    rows_per_page = max(rows_per_page, 1)
+
+    def quebrar_texto(texto, max_chars_l1=85, max_chars_l2=85):
+        if len(texto) <= max_chars_l1:
+            return [texto]
+        palavras = texto.split()
+        linhas = []
+        limites = [max_chars_l1, max_chars_l2]
+
+        for limite in limites:
+            nova_linha = ""
+            while palavras:
+                teste = (nova_linha + " " + palavras[0]).strip()
+                if len(teste) <= limite:
+                    nova_linha = teste
+                    palavras.pop(0)
+                else:
+                    break
+            if nova_linha:
+                linhas.append(nova_linha)
+
+        if palavras:
+            sobra = " ".join(palavras)
+            if linhas:
+                linhas[-1] = (linhas[-1][:max(0, len(linhas[-1]) - 3)
+                                         ] + "...") if len(linhas[-1]) > 3 else "..."
+            else:
+                linhas = [sobra[:max_chars_l1 - 3] + "..."]
+        return linhas[:2]
+
+    def desenhar_cabecalho_pagina():
+        c.setFont("Helvetica-Bold", 14)
+        c.setFillColor(colors.HexColor("#002D62"))
+        c.drawString(margem_esq, page_height -
+                     margem_top, "Tabela de Produtos")
+
+        y_header_top = page_height - margem_top - titulo_h
+        y_header_bottom = y_header_top - header_h
+
+        c.setFillColor(colors.HexColor("#002D62"))
+        c.rect(margem_esq, y_header_bottom,
+               largura_util, header_h, fill=1, stroke=0)
+
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica-Bold", 10)
+        c.drawCentredString(x_foto + col_foto / 2, y_header_bottom + 7, "Foto")
+        c.drawCentredString(x_desc + col_desc / 2,
+                            y_header_bottom + 7, "Código / Descrição")
+        c.drawCentredString(x_preco + col_preco / 2,
+                            y_header_bottom + 7, "Preço Final")
+        c.drawCentredString(x_chk + col_chk / 2, y_header_bottom + 7, "Levar")
+        c.drawCentredString(x_qtd + col_qtd / 2, y_header_bottom + 7, "Qtd")
+
+        return y_header_bottom
+
+    def desenhar_linha(y_top, row, idx_global):
+        y_bottom = y_top - row_h
+
+        if idx_global % 2 == 0:
+            c.setFillColor(colors.white)
+        else:
+            c.setFillColor(colors.HexColor("#F7F7F7"))
+        c.rect(margem_esq, y_bottom, largura_util, row_h, fill=1, stroke=0)
+
+        c.setStrokeColor(colors.grey)
+        c.rect(margem_esq, y_bottom, largura_util, row_h, fill=0, stroke=1)
+
+        for x in [x_desc, x_preco, x_chk, x_qtd]:
+            c.line(x, y_bottom, x, y_top)
+
         codigo = normalizar_codigo_imagem(row.get("Código", ""))
-        desc = str(row.get("Descrição", "")).strip()[:50]
+        codigo_original = str(row.get("Código", "")).strip()
+        desc = str(row.get("Descrição", "")).strip()
         preco = float(row.get("Preço Final", row.get("Preço Atual", 0.0)))
-        img_path = img_idx.get(codigo)
+        preco_str = f"R$ {preco:.2f}".replace(".", ",")
 
+        img_path = img_idx.get(codigo)
         if img_path and os.path.exists(img_path):
             try:
                 img_temp = Image.open(img_path).convert("RGBA")
@@ -716,59 +841,138 @@ def gerar_pdf_planilha(df_produtos):
                 if bbox:
                     img_temp = img_temp.crop(bbox)
 
+                max_img_w = 65
+                max_img_h = 56
                 img_w, img_h = img_temp.size
-                ratio = min(max_img_size / img_w, max_img_size / img_h)
+                ratio = min(max_img_w / img_w, max_img_h / img_h)
                 new_w, new_h = int(img_w * ratio), int(img_h * ratio)
                 img_temp = img_temp.resize(
                     (new_w, new_h), Image.Resampling.LANCZOS)
 
-                bg_square = Image.new(
-                    "RGBA", (int(max_img_size), int(max_img_size)), (255, 255, 255, 255))
-                offset_x, offset_y = (
-                    int(max_img_size) - new_w) // 2, (int(max_img_size) - new_h) // 2
-                bg_square.paste(img_temp, (offset_x, offset_y), img_temp)
-
                 temp_img_buffer = BytesIO()
-                bg_square.save(temp_img_buffer, format="PNG")
+                img_temp.save(temp_img_buffer, format="PNG")
                 temp_img_buffer.seek(0)
-                img_cell = RLImage(
-                    temp_img_buffer, width=max_img_size, height=max_img_size)
+
+                img_reader = ImageReader(temp_img_buffer)
+                img_x = x_foto + (col_foto - new_w) / 2
+                img_y = y_bottom + (row_h - new_h) / 2
+                c.drawImage(img_reader, img_x, img_y, width=new_w,
+                            height=new_h, mask='auto')
             except Exception:
-                img_cell = "Sem Foto"
+                c.setFont("Helvetica", 8)
+                c.setFillColor(colors.red)
+                c.drawCentredString(x_foto + col_foto / 2,
+                                    y_bottom + 25, "Sem Foto")
         else:
-            img_cell = "Sem Foto"
+            c.setFont("Helvetica", 8)
+            c.setFillColor(colors.red)
+            c.drawCentredString(x_foto + col_foto / 2,
+                                y_bottom + 25, "Sem Foto")
 
-        preco_str = f"R$ {preco:.2f}".replace(".", ",")
-        data.append([img_cell, desc, preco_str])
+        texto_desc = f"{codigo_original} - {desc}"
+        linhas = quebrar_texto(texto_desc, max_chars_l1=85, max_chars_l2=85)
 
-    tabela = Table(data, colWidths=[1.2*inch, 5.5*inch, 1.3*inch])
-    estilo = TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#002D62")),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 12),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-        ('GRID', (0, 0), (-1, -1), 1, colors.grey),
-        ('ROWBACKGROUNDS', (0, 1), (-1, -1),
-         [colors.white, colors.HexColor("#F0F0F0")]),
-        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-        ('FONTSIZE', (0, 1), (-1, -1), 10),
-        ('LEFTPADDING', (0, 0), (-1, -1), 8),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 8),
-        ('TOPPADDING', (0, 0), (-1, -1), 10),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
-    ])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 11)
 
-    tabela.setStyle(estilo)
-    elementos.append(tabela)
-    pdf.build(elementos)
+        if len(linhas) == 1:
+            y_text = y_top - 34
+            c.drawString(x_desc + 12, y_text, linhas[0])
+        else:
+            y_text = y_top - 24
+            for linha in linhas:
+                c.drawString(x_desc + 12, y_text, linha)
+                y_text -= 16
+
+        c.setFont("Helvetica-Bold", 10)
+        c.drawCentredString(x_preco + col_preco / 2, y_bottom + 24, preco_str)
+
+        chk_name = f"levar_{idx_global}"
+        form.checkbox(
+            name=chk_name,
+            tooltip=f"Selecionar produto {codigo_original}",
+            x=x_chk + 18,
+            y=y_bottom + 20,
+            buttonStyle='check',
+            borderWidth=1,
+            borderColor=colors.black,
+            fillColor=colors.white,
+            textColor=colors.black,
+            forceBorder=True,
+            checked=False
+        )
+
+        qtd_name = f"qtd_{idx_global}"
+        form.textfield(
+            name=qtd_name,
+            tooltip=f"Quantidade do produto {codigo_original}",
+            x=x_qtd + 6,
+            y=y_bottom + 16,
+            width=col_qtd - 12,
+            height=22,
+            borderStyle='inset',
+            borderWidth=1,
+            borderColor=colors.black,
+            fillColor=colors.white,
+            textColor=colors.black,
+            forceBorder=True,
+            value=""
+        )
+
+    def desenhar_rodape_final(total_produtos, y_fim_planilha):
+        y2 = 28
+        y3 = 16
+
+        # Frase de ofertas centralizada logo abaixo da tabela
+        c.setFillColor(colors.HexColor("#0f172a"))
+        c.setFont("Helvetica-Bold", 12)
+        c.drawCentredString(page_width / 2, y_fim_planilha - 22,
+                            "*Ofertas válidas para hoje ou enquanto durarem os estoques.")
+
+        c.setFont("Helvetica", 8)
+        c.setFillColor(colors.grey)
+        c.drawRightString(page_width - margem_dir, 10,
+                          f"Total de produtos: {total_produtos}")
+
+        c.setFont("Helvetica", 8)
+        c.drawString(margem_esq, y2,
+                     "Abrir no Adobe Acrobat Reader para preencher")
+
+        c.setFillColor(colors.HexColor("#666666"))
+        c.setFont("Helvetica", 6.5)
+        c.drawString(
+            margem_esq, y3, "Sistema elaborado por EDG ENGENHARIA REPRESENTAÇÕES LTDA")
+
+    total = len(df_produtos)
+    registros = df_produtos.to_dict("records")
+
+    for inicio in range(0, total, rows_per_page):
+        y_header_bottom = desenhar_cabecalho_pagina()
+        y_top = y_header_bottom
+
+        bloco = registros[inicio:inicio + rows_per_page]
+        for i, row in enumerate(bloco):
+            desenhar_linha(y_top - (i * row_h), row, inicio + i)
+
+        ultima_pagina = (inicio + rows_per_page >= total)
+        if ultima_pagina:
+            y_fim = y_top - (len(bloco) * row_h)
+            desenhar_rodape_final(total, y_fim)
+        else:
+            c.setFont("Helvetica", 8)
+            c.setFillColor(colors.grey)
+            c.drawRightString(page_width - margem_dir, 10,
+                              f"Total de produtos: {total}")
+            c.showPage()
+
+    c.save()
     buffer.seek(0)
 
     st.balloons()
-    st.success(f"✅ PDF gerado com sucesso! ({len(df_produtos)} produtos)")
+    st.success(
+        f"✅ PDF interativo gerado com sucesso! ({len(df_produtos)} produtos)")
     return buffer
+
 
 # ==========================================
 # CARREGAMENTO DOS DADOS EXCEL (PASTA INTELIGENTE)
@@ -1328,7 +1532,7 @@ with tab1:
             "O painel está vazio. Busque e adicione produtos acima para montar seu encarte.")
     else:
         ch_c, stat_c, img_c, desc_c, prec_c, co_c, flex_c, des_c, imp_c, fin_c = st.columns(
-            [1.2, 0.9, 0.7, 2.5, 1.0, 1.3, 1.3, 1.3, 1.0, 1.3])
+            [1.2, 0.9, 1.0, 2.2, 1.0, 1.3, 1.3, 1.3, 1.0, 1.3])
         ch_c.markdown("**Ações**")
         stat_c.markdown("**Status**")
         img_c.markdown("**Foto**")
@@ -1360,7 +1564,7 @@ with tab1:
                     prod.get('Imposto', False))
 
             c_bt, c_st, c_ig, c_ds, c_pr, c_co, c_fl, c_de, c_im, c_fi = st.columns(
-                [1.2, 0.9, 0.7, 2.5, 1.0, 1.3, 1.3, 1.3, 1.0, 1.3], vertical_alignment="center")
+                [1.2, 0.9, 1.0, 2.2, 1.0, 1.3, 1.3, 1.3, 1.0, 1.3], vertical_alignment="center")
 
             with c_bt:
                 b1, b2, b3, b4 = st.columns([1.2, 1, 1, 1])
@@ -1383,17 +1587,41 @@ with tab1:
             with c_st:
                 st.write(prod['Status'])
 
-            with c_ig:
-                cod = normalizar_codigo_imagem(prod['Código'])
-                caminho_img = img_idx_global.get(cod)
-                url_google = f"https://www.google.com/search?tbm=isch&q={urllib.parse.quote(prod['Descrição'])}"
-                if caminho_img and os.path.exists(caminho_img):
-                    st.image(caminho_img, width=45)
-                    st.markdown(f"<a href='{url_google}' target='_blank' style='display:block; text-align:center; background-color:#f1f5f9; color:#475569; font-size:9px; font-weight:bold; padding:4px 0; border-radius:4px; text-decoration:none; margin-top:2px; border:1px solid #cbd5e1;'>🔄 Atualizar</a>", unsafe_allow_html=True)
-                else:
-                    st.markdown(
-                        "<div style='text-align:center; color:#ff4b4b; font-size:10px; font-weight:bold; line-height:1.2; padding-top:5px;'>❌<br>Sem Foto</div>", unsafe_allow_html=True)
-                    st.markdown(f"<a href='{url_google}' target='_blank' style='display:block; text-align:center; background-color:#3b82f6; color:#ffffff; font-size:9px; font-weight:bold; padding:4px 0; border-radius:4px; text-decoration:none; margin-top:2px;'>🔍 Buscar</a>", unsafe_allow_html=True)
+        with c_ig:
+            cod = normalizar_codigo_imagem(prod['Código'])
+            caminho_img = img_idx_global.get(cod)
+            url_google = f"https://www.google.com/search?tbm=isch&q={urllib.parse.quote(prod['Descrição'])}"
+
+            # Removemos a quebra de 2 colunas e voltamos para uma renderização empilhada vertical,
+            # para não ter problema de falta de espaço
+
+            if caminho_img and os.path.exists(caminho_img):
+                st.image(caminho_img, width=45)
+
+                # Botão de Busca (estilo leve)
+                st.markdown(f"<a href='{url_google}' target='_blank' style='display:block; text-align:center; background-color:#f1f5f9; color:#475569; font-size:9px; font-weight:bold; padding:4px 0; border-radius:4px; text-decoration:none; margin-top:2px; border:1px solid #cbd5e1;'>🔄 Buscar</a>", unsafe_allow_html=True)
+
+                # Popover de Troca
+                with st.popover("📤 Trocar", use_container_width=True):
+                    nova_img = st.file_uploader("Nova foto:", type=[
+                                                'png', 'jpg', 'jpeg', 'webp'], key=f"up_trocar_{uid}", label_visibility="collapsed")
+                    if nova_img and st.button("Salvar Troca", key=f"btn_trocar_{uid}", type="primary"):
+                        salvar_imagem_upload(nova_img, cod)
+                        st.rerun()
+
+            else:
+                st.markdown("<div style='text-align:center; color:#ff4b4b; font-size:10px; font-weight:bold; line-height:1.2; padding-top:5px; padding-bottom:5px;'>❌<br>Sem Foto</div>", unsafe_allow_html=True)
+
+                # Botão de Busca (estilo azul forte)
+                st.markdown(f"<a href='{url_google}' target='_blank' style='display:block; text-align:center; background-color:#3b82f6; color:#ffffff; font-size:9px; font-weight:bold; padding:4px 0; border-radius:4px; text-decoration:none; margin-top:2px;'>🔍 Buscar</a>", unsafe_allow_html=True)
+
+                # Popover de Subir Imagem
+                with st.popover("📤 Subir", use_container_width=True):
+                    nova_img = st.file_uploader("Fazer upload:", type=[
+                                                'png', 'jpg', 'jpeg', 'webp'], key=f"up_novo_{uid}", label_visibility="collapsed")
+                    if nova_img and st.button("Salvar Imagem", key=f"btn_novo_{uid}", type="primary"):
+                        salvar_imagem_upload(nova_img, cod)
+                        st.rerun()
 
             with c_ds:
                 cod_base = normalizar_codigo_imagem(prod['Código'])
@@ -1566,16 +1794,46 @@ with tab1:
             st.download_button("⬇️ BAIXAR PDF GERADO", data=st.session_state['pdf_buffer_pronto'],
                                file_name=f"produtos_planilha_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf", mime="application/pdf", type="primary", use_container_width=True)
 
-        st.markdown(
-            "<hr style='margin: 15px 0;'><p class='subtitulo' style='text-align:center;'>🖼️ Escolha os Layouts</p>", unsafe_allow_html=True)
+            st.markdown(
+                "<hr style='margin: 15px 0;'><p class='subtitulo' style='text-align:center;'>🖼️ Escolha os Layouts</p>",
+                unsafe_allow_html=True
+            )
+        # === RENDERIZAÇÃO DAS ARTES INDIVIDUAIS GERADAS ===
+        if st.session_state.get('galeria_individuais'):
+            st.markdown("<hr style='margin: 15px 0'>", unsafe_allow_html=True)
+            st.markdown(
+                "<h4 style='text-align:center; color:#1E293B;'>🎨 Galeria de Artes Individuais</h4>", unsafe_allow_html=True)
+
+            cols_galeria = st.columns(4)
+            for idx, arte in enumerate(st.session_state['galeria_individuais']):
+                c_gal = cols_galeria[idx % 4]
+                with c_gal:
+                    if os.path.exists(arte['path']):
+                        st.image(arte['path'], use_container_width=True)
+                        with open(arte['path'], "rb") as f:
+                            st.download_button(
+                                label="⬇️ Baixar",
+                                data=f,
+                                file_name=arte['nome'],
+                                mime="image/jpeg",
+                                key=f"dl_indiv_{idx}",
+                                use_container_width=True
+                            )
+
         c_prev1, c_prev2, c_prev3 = st.columns(3)
 
         with c_prev1:
             texto_layout = "Sem Limite Definido" if n_layout == 0 else f"{n_layout} Espaços"
             st.markdown(
-                f"<div style='text-align:center; font-weight:bold; color:#1E293B; margin-bottom:8px;'>Layout do Tabloide ({texto_layout})</div>", unsafe_allow_html=True)
-            st.selectbox("Versão Tabloide", [
-                         "Layout 1", "Layout 2", "Layout 3", "Layout 4"], key="sel_grade", label_visibility="collapsed")
+                f"<div style='text-align:center; font-weight:bold; color:#1E293B; margin-bottom:8px;'>Layout do Tabloide ({texto_layout})</div>",
+                unsafe_allow_html=True
+            )
+            st.selectbox(
+                "Versão Tabloide",
+                ["Layout 1", "Layout 2", "Layout 3", "Layout 4"],
+                key="sel_grade",
+                label_visibility="collapsed"
+            )
 
             if n_layout != 0:
                 opt_g = st.session_state.get("sel_grade", "Layout 1")
@@ -1586,8 +1844,10 @@ with tab1:
                 else:
                     nome_fundo_grade = f"Modelo {n_layout} Espaços-{num_v_g}.jpg"
 
-                f_path_g = os.path.join(os.path.dirname(
-                    os.path.abspath(__file__)), nome_fundo_grade)
+                f_path_g = os.path.join(
+                    os.path.dirname(os.path.abspath(__file__)),
+                    nome_fundo_grade
+                )
                 if os.path.exists(f_path_g):
                     st.image(f_path_g, use_container_width=True)
                 else:
@@ -1599,14 +1859,22 @@ with tab1:
 
         with c_prev2:
             st.markdown(
-                "<div style='text-align:center; font-weight:bold; color:#1E293B; margin-bottom:8px;'>Arte Individual</div>", unsafe_allow_html=True)
-            st.selectbox("Versão Individual", [
-                         "Layout 1", "Layout 2", "Layout 3", "Layout 4"], key="sel_indiv", label_visibility="collapsed")
+                "<div style='text-align:center; font-weight:bold; color:#1E293B; margin-bottom:8px;'>Arte Individual</div>",
+                unsafe_allow_html=True
+            )
+            st.selectbox(
+                "Versão Individual",
+                ["Layout 1", "Layout 2", "Layout 3", "Layout 4"],
+                key="sel_indiv",
+                label_visibility="collapsed"
+            )
 
             opt_i = st.session_state.get("sel_indiv", "Layout 1")
             nome_fundo_indiv = f"Modelo_arte_individual_{opt_i.split()[-1]}.jpg"
-            f_path_i = os.path.join(os.path.dirname(
-                os.path.abspath(__file__)), nome_fundo_indiv)
+            f_path_i = os.path.join(
+                os.path.dirname(os.path.abspath(__file__)),
+                nome_fundo_indiv
+            )
 
             if os.path.exists(f_path_i):
                 st.image(f_path_i, use_container_width=True)
@@ -1614,18 +1882,18 @@ with tab1:
                 st.warning(f"⚠️ Imagem '{nome_fundo_indiv}' faltando.")
 
         with c_prev3:
-            st.markdown("<div style='text-align:center; font-weight:bold; color:#1E293B; margin-bottom:8px;'>PDF Planilha</div><div style='background-color: #f1f5f9; border: 2px dashed #cbd5e1; border-radius: 8px; height: 180px; display: flex; align-items: center; justify-content: center; flex-direction: column;'><span style='font-size: 40px;'>📄</span><span style='color: #64748b; font-weight: bold; margin-top: 10px;'>Formato Fixo</span></div>", unsafe_allow_html=True)
+            st.markdown("""
+            <div style='text-align:center; font-weight:bold; color:#1E293B; margin-bottom:8px;'>
+                PDF Planilha
+            </div>
+            <div style='background-color: #ecfeff; border: 2px dashed #06b6d4; border-radius: 8px; height: 180px;
+                        display: flex; align-items: center; justify-content: center; flex-direction: column;'>
+                <span style='font-size: 40px;'>📄</span>
+                <span style='color: #0f172a; font-weight: bold; margin-top: 10px;'>PDF Interativo</span>
+                <span style='color: #475569; font-size: 12px; margin-top: 6px;'>Com checkboxes e campo de quantidade</span>
+            </div>
+            """, unsafe_allow_html=True)
 
-    if len(st.session_state.get('galeria_individuais', [])) > 0:
-        st.markdown(
-            "<p class='titulo-secao'>🖼️ Galeria de Artes Geradas</p>", unsafe_allow_html=True)
-        colunas = st.columns(3)
-        for index, item in enumerate(st.session_state['galeria_individuais']):
-            with colunas[index % 3]:
-                st.image(item["path"], use_container_width=True)
-                with open(item["path"], "rb") as file:
-                    st.download_button(label="⬇️ Baixar Imagem", data=file,
-                                       file_name=item["nome"], mime="image/jpeg", key=f"dl_btn_galeria_{item['nome']}", use_container_width=True)
 
 with tab2:
     st.header("🤖 Decifrador de Sistema")
