@@ -1434,7 +1434,7 @@ with st.sidebar:
     else:
         st.info("Nenhum item disponível para filtrar nessas categorias.")
 
-        st.session_state["df_filtrado_atual"] = df_filtrado.copy()
+    st.session_state["df_filtrado_atual"] = df_filtrado.copy()
 
 
 tab1, tab2 = st.tabs(["📊 Montagem do Tabloide", "🤖 IA Limpador"])
