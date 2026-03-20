@@ -1712,88 +1712,86 @@ with tab1:
 
         st.markdown("---")
 
+    with st.expander("Finalizar e Gerar Artes...", expanded=True):
+        st.markdown("<p class='titulo-secao'>Painel de Geração</p>",
+                    unsafe_allow_html=True)
+
+        # DECLARAÇÃO DAS COLUNAS AQUI (Isto evita o NameError)
+        btn1, btn2, btn3 = st.columns(3)
+
         with btn1:
-            if st.button("🚀 GERAR TABLOIDE (GRADE)", type="primary", use_container_width=True):
-                if n_layout == 0:
+            if st.button("GERAR TABLOIDE (GRADE)", type="primary", use_container_width=True):
+                if nlayout == 0:
                     st.error(
-                        "⚠️ Para gerar um tabloide em grade, escolha um layout fixo (9, 12, 16 ou 20) no menu lateral.")
+                        "Para gerar um tabloide em grade, escolha um layout fixo (9, 12, 16 ou 20) no menu lateral.")
                 else:
-                    st.session_state['galeria_individuais'], st.session_state['pdf_buffer_pronto'] = [
-                    ], None
+                    st.session_state.galeria_individuais, st.session_state.pdf_buffer_pronto = [], None
                     df_final = pd.DataFrame(
-                        st.session_state['produtos_selecionados'])
+                        st.session_state.produtos_selecionados)
                     if not df_final.empty:
                         df_final = df_final[df_final['Levar'] == True]
-
                     if df_final.empty:
-                        st.error("⚠️ Você não deixou nenhum item marcado!")
+                        st.error("Você não deixou nenhum item marcado!")
                     else:
-                        padrao_fundo = LAYOUTS.get(n_layout, LAYOUTS[9])[
-                            "bg_pattern"]
-                        num_versao = opt_grade.split()[-1]
-
+                        padrao_fundo = LAYOUTS.get(nlayout, LAYOUTS[9])[
+                            'bg_pattern']
+                        num_versao = opt_grade.split("-")[-1]
                         if "Modelo" in padrao_fundo:
-                            fundo_grade_name = f"Modelo {n_layout} Espaços-{num_versao}.jpg"
+                            fundo_grade_name = f"Modelo {nlayout} Espaços-{num_versao}.jpg"
                         else:
                             fundo_grade_name = f"FUNDO-BASE-USADO-NA-AUTOMACAO-{num_versao}.jpg"
 
                         base_dir = os.path.dirname(os.path.abspath(__file__))
-                        f_path_grade = os.path.join(base_dir, fundo_grade_name)
+                        fpath_grade = os.path.join(base_dir, fundo_grade_name)
 
                         alertas = checar_imposto_st(df_final)
                         if alertas:
-                            st.session_state['confirmacao_st'], st.session_state['alertas_st'], st.session_state[
-                                'df_pendente'], st.session_state['path_pendente'] = 'grade', alertas, df_final, f_path_grade
+                            st.session_state.confirmacao_st, st.session_state.alertas_st, st.session_state.df_pendente, st.session_state.path_pendente = 'grade', alertas, df_final, fpath_grade
                         else:
-                            st.session_state['confirmacao_st'] = None
+                            st.session_state.confirmacao_st = None
                             acionar_gerador_grade(
-                                df_final, f_path_grade, n_layout)
+                                df_final, fpath_grade, nlayout)
 
         with btn2:
-            if st.button("📱 GERAR ARTES INDIVIDUAIS", type="secondary", use_container_width=True):
-                opt_indiv = st.session_state.get("sel_indiv", "Layout 1")
-                num_versao_indiv = opt_indiv.split()[-1]
-
+            if st.button("GERAR ARTES INDIVIDUAIS", type="secondary", use_container_width=True):
+                opt_indiv = st.session_state.get('sel_indiv', 'Layout 1')
+                num_versao_indiv = opt_indiv.split("-")[-1]
                 base_dir = os.path.dirname(os.path.abspath(__file__))
-                f_path_indiv = os.path.join(
-                    base_dir, f"Modelo_arte_individual_{num_versao_indiv}.jpg")
+                fpath_indiv = os.path.join(
+                    base_dir, f"Modelo_arte_individual-{num_versao_indiv}.jpg")
+                st.session_state.pdf_buffer_pronto = None
 
-                st.session_state['pdf_buffer_pronto'] = None
-                df_final = pd.DataFrame(
-                    st.session_state['produtos_selecionados'])
+                df_final = pd.DataFrame(st.session_state.produtos_selecionados)
                 if not df_final.empty:
                     df_final = df_final[df_final['Levar'] == True]
 
                 if df_final.empty:
-                    st.error("⚠️ O painel está vazio ou sem itens marcados!")
+                    st.error("O painel está vazio ou sem itens marcados!")
                 else:
                     alertas = checar_imposto_st(df_final)
                     if alertas:
-                        st.session_state['confirmacao_st'], st.session_state['alertas_st'], st.session_state[
-                            'df_pendente'], st.session_state['path_pendente'] = 'indiv', alertas, df_final, f_path_indiv
+                        st.session_state.confirmacao_st, st.session_state.alertas_st, st.session_state.df_pendente, st.session_state.path_pendente = 'indiv', alertas, df_final, fpath_indiv
                     else:
-                        st.session_state['confirmacao_st'] = None
-                        st.session_state['galeria_individuais'] = acionar_gerador_individual(
-                            df_final, f_path_indiv)
+                        st.session_state.confirmacao_st = None
+                        st.session_state.galeria_individuais = acionar_gerador_individual(
+                            df_final, fpath_indiv)
 
         with btn3:
-            if st.button("📄 GERAR PDF (PLANILHA)", type="secondary", use_container_width=True):
-                st.session_state['pdf_buffer_pronto'] = None
-                df_final = pd.DataFrame(
-                    st.session_state['produtos_selecionados'])
+            if st.button("GERAR PDF PLANILHA", type="secondary", use_container_width=True):
+                st.session_state.pdf_buffer_pronto = None
+                df_final = pd.DataFrame(st.session_state.produtos_selecionados)
                 if not df_final.empty:
                     df_final = df_final[df_final['Levar'] == True]
 
                 if df_final.empty:
-                    st.error("⚠️ O painel está vazio ou sem itens marcados!")
+                    st.error("O painel está vazio ou sem itens marcados!")
                 else:
                     alertas = checar_imposto_st(df_final)
                     if alertas:
-                        st.session_state['confirmacao_st'], st.session_state[
-                            'alertas_st'], st.session_state['df_pendente'] = 'pdf', alertas, df_final
+                        st.session_state.confirmacao_st, st.session_state.alertas_st, st.session_state.df_pendente = 'pdf', alertas, df_final
                     else:
-                        st.session_state['confirmacao_st'] = None
-                        st.session_state['pdf_buffer_pronto'] = gerar_pdf_planilha(
+                        st.session_state.confirmacao_st = None
+                        st.session_state.pdf_buffer_pronto = gerar_pdf_planilha(
                             df_final)
 
         if st.session_state['confirmacao_st'] is not None:
