@@ -1877,6 +1877,19 @@ with st.expander("Finalizar e Gerar Artes...", expanded=True):
             if st.button("❌ NÃO, CANCELAR E ARRUMAR", type="secondary", use_container_width=True):
                 st.session_state["confirmacao_st"] = None
                 st.rerun()
+    # --- INÍCIO DO BLOCO DE DOWNLOAD DO PDF ---
+            if st.session_state.get('pdf_buffer_pronto') is not None:
+                st.markdown("<hr style='margin: 15px 0;'>",
+                            unsafe_allow_html=True)
+                st.download_button(
+                    label="⬇️ BAIXAR PDF GERADO",
+                    data=st.session_state['pdf_buffer_pronto'],
+                    file_name=f"produtos_planilha_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
+                    mime="application/pdf",
+                    type="primary",
+                    use_container_width=True
+                )
+    # --- FIM DO BLOCO DE DOWNLOAD DO PDF ---
 
         st.markdown(
             "<hr style='margin: 15px 0;'><p class='subtitulo' style='text-align:center;'>🖼️ Escolha os Layouts</p>", unsafe_allow_html=True)
