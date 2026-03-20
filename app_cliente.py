@@ -11,7 +11,7 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib import colors
 
 # ==========================================
-# CONFIGURAÇÃO DA PÁGINA
+# CONFIGURAÇÃO DA PÁGINA E CSS
 # ==========================================
 st.set_page_config(
     page_title="Catálogo de Pedidos - Cliente",
@@ -19,6 +19,18 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# CSS para padronizar o tamanho das imagens na grade de produtos
+st.markdown("""
+<style>
+    div[data-testid="stImage"] img {
+        object-fit: contain;
+        height: 180px;
+        width: 100%;
+        background-color: white;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 # ==========================================
 # FUNÇÕES DE IMAGEM E DIRETÓRIOS
@@ -153,17 +165,47 @@ def carregar_dados():
 df_raw = carregar_dados()
 
 # ==========================================
-# VARIÁVEIS DE SESSÃO
+# VARIÁVEIS DE SESSÃO E NAVEGAÇÃO
 # ==========================================
 if 'carrinho' not in st.session_state:
     st.session_state['carrinho'] = {}
 
+if 'pagina_atual' not in st.session_state:
+    st.session_state['pagina_atual'] = 1
+
+
+def resetar_pagina():
+    st.session_state['pagina_atual'] = 1
+
+
+def proxima_pagina():
+    st.session_state['pagina_atual'] += 1
+
+
+def pagina_anterior():
+    if st.session_state['pagina_atual'] > 1:
+        st.session_state['pagina_atual'] -= 1
+
 # ==========================================
-# GERAÇÃO DO PDF
+# GERAÇÃO DO PDF OTIMIZADO
 # ==========================================
+
+
+def remover_fundo_branco(img: Image.Image) -> Image.Image:
+    img = img.convert("RGBA")
+    datas = img.getdata()
+    newData = []
+    for r, g, b, a in datas:
+        if r > 240 and g > 240 and b > 240:
+            newData.append((255, 255, 255, 0))
+        else:
+            newData.append((r, g, b, a))
+    img.putdata(newData)
+    return img
 
 
 def gerar_pdf_pedido(produtos_selecionados):
+    st.toast("📄 Gerando PDF de Pedido com imagens em alta qualidade...", icon="⏳")
     img_idx = obter_indice_imagens()
     buffer = BytesIO()
 
@@ -186,13 +228,27 @@ def gerar_pdf_pedido(produtos_selecionados):
         img_pdf = ""
         if img_path and os.path.exists(img_path):
             try:
-                img_pil = Image.open(img_path)
-                img_pil.thumbnail((60, 60))
+                # OTIMIZAÇÃO DE IMAGEM PARA PDF
+                img_pil = Image.open(img_path).convert("RGBA")
+                img_pil = remover_fundo_branco(img_pil)
+                bbox = img_pil.getbbox()
+                if bbox:
+                    img_pil = img_pil.crop(bbox)
+
+                # Dimensão da imagem para a tabela com proporção real
+                img_pil.thumbnail((250, 250), Image.Resampling.LANCZOS)
+
+                bg = Image.new("RGB", img_pil.size, (255, 255, 255))
+                bg.paste(img_pil, mask=img_pil.split()[3])
+
                 temp_buffer = BytesIO()
-                img_pil.save(temp_buffer, format="PNG")
+                bg.save(temp_buffer, format="JPEG", quality=95)
                 temp_buffer.seek(0)
-                img_pdf = RLImage(temp_buffer, width=50, height=50)
-            except:
+
+                # ReportLab: tamanho proporcional sem forçar achatar a imagem
+                img_pdf = RLImage(temp_buffer, width=60,
+                                  height=60, kind='proportional')
+            except Exception as e:
                 img_pdf = "Sem Foto"
         else:
             img_pdf = "Sem Foto"
@@ -200,16 +256,24 @@ def gerar_pdf_pedido(produtos_selecionados):
         data.append([img_pdf, prod['Código'],
                     Paragraph(desc, styles['Normal'])])
 
-    t = Table(data, colWidths=[80, 100, 350])
+    # Ajuste: alturas de linha maiores (70) para acomodar a imagem em proporção real
+    t = Table(data, colWidths=[80, 100, 350], rowHeights=[
+              30] + [70] * len(produtos_selecionados))
     t.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#002D62")),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
+        ('TOPPADDING', (0, 0), (-1, 0), 6),
         ('BACKGROUND', (0, 1), (-1, -1), colors.white),
         ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        # Espaçamento para não cortar as imagens na tabela
+        ('LEFTPADDING', (0, 1), (0, -1), 5),
+        ('RIGHTPADDING', (0, 1), (0, -1), 5),
+        ('TOPPADDING', (0, 1), (0, -1), 5),
+        ('BOTTOMPADDING', (0, 1), (0, -1), 5),
     ]))
 
     elements.append(t)
@@ -223,7 +287,7 @@ def gerar_pdf_pedido(produtos_selecionados):
 # INTERFACE DO STREAMLIT
 # ==========================================
 with st.sidebar:
-    st.header("🛒 Meu Carrinho")
+    st.header("🛒 Resumo")
 
     carrinho_lista = list(st.session_state['carrinho'].values())
     st.write(f"**Itens selecionados:** {len(carrinho_lista)}")
@@ -250,52 +314,61 @@ with st.sidebar:
     df_filtrado = df_raw.copy()
 
     if not df_filtrado.empty:
-        # Filtro de Indústria
         industrias_disp = sorted(
             [str(x) for x in df_filtrado['Indústria'].dropna().unique() if str(x).strip() != ''])
         industria_f = st.selectbox("1. Indústria", options=[
-                                   'Todas'] + industrias_disp)
+                                   'Todas'] + industrias_disp, on_change=resetar_pagina)
         if industria_f != 'Todas':
             df_filtrado = df_filtrado[df_filtrado['Indústria'] == industria_f]
 
-        # Filtro de Marca
         marcas_disp = sorted(
             [str(x) for x in df_filtrado['Marca'].dropna().unique() if str(x).strip() != ''])
-        marca_f = st.selectbox("2. Marca", options=['Todas'] + marcas_disp)
+        marca_f = st.selectbox("2. Marca", options=[
+                               'Todas'] + marcas_disp, on_change=resetar_pagina)
         if marca_f != 'Todas':
             df_filtrado = df_filtrado[df_filtrado['Marca'] == marca_f]
 
-        # Filtro de Categoria
         cats_disp = sorted([str(x) for x in df_filtrado['Categoria'].dropna(
         ).unique() if str(x).strip() not in ('', 'Sem Categoria')])
-        categoria_f = st.selectbox(
-            "3. Categoria", options=['Todas'] + cats_disp)
+        categoria_f = st.selectbox("3. Categoria", options=[
+                                   'Todas'] + cats_disp, on_change=resetar_pagina)
         if categoria_f != 'Todas':
             df_filtrado = df_filtrado[df_filtrado['Categoria'] == categoria_f]
 
 st.title("Catálogo de Produtos")
-st.write("Selecione os produtos que deseja adicionar ao seu pedido.")
 
 if not df_filtrado.empty:
     img_idx_global = obter_indice_imagens()
 
-    # Paginação simples para não sobrecarregar a tela do cliente
-    itens_por_pagina = 50
+    # Exibir sempre 20 produtos (5 linhas e 4 colunas)
+    itens_por_pagina = 20
     total_paginas = max(1, len(df_filtrado) // itens_por_pagina +
                         (1 if len(df_filtrado) % itens_por_pagina > 0 else 0))
 
-    col_pag_1, col_pag_2 = st.columns([1, 5])
-    with col_pag_1:
-        pagina_atual = st.number_input(
-            "Página", min_value=1, max_value=total_paginas, value=1)
+    if st.session_state['pagina_atual'] > total_paginas:
+        st.session_state['pagina_atual'] = 1
+
+    pagina_atual = st.session_state['pagina_atual']
+
+    # Controles de Paginação no Topo
+    st.divider()
+    col_nav1, col_nav2, col_nav3 = st.columns([1, 2, 1])
+    with col_nav1:
+        st.button("⬅️ Página Anterior", on_click=pagina_anterior,
+                  disabled=(pagina_atual == 1), use_container_width=True)
+    with col_nav2:
+        st.markdown(
+            f"<h4 style='text-align: center;'>Página {pagina_atual} de {total_paginas}</h4>", unsafe_allow_html=True)
+    with col_nav3:
+        st.button("Próxima Página ➡️", on_click=proxima_pagina, disabled=(
+            pagina_atual == total_paginas), use_container_width=True)
+    st.divider()
 
     inicio = (pagina_atual - 1) * itens_por_pagina
     fim = inicio + itens_por_pagina
     df_exibir = df_filtrado.iloc[inicio:fim]
 
-    st.divider()
-
-    # Exibição em grade (4 colunas)
+    # Exibição da grade de produtos
     for i in range(0, len(df_exibir), 4):
         cols = st.columns(4)
         for j, col in enumerate(cols):
@@ -307,28 +380,88 @@ if not df_filtrado.empty:
                 img_path = img_idx_global.get(cod_img)
 
                 with col:
-                    # Usando container para criar um "card" para cada produto
                     with st.container(border=True):
                         if img_path and os.path.exists(img_path):
                             st.image(img_path, use_container_width=True)
                         else:
-                            # Box placeholder se não tiver imagem
                             st.info("📷 Sem Imagem")
 
-                        st.write(f"**Cód: {cod}**")
-                        st.caption(desc)
+                        st.markdown(f"**Cód: {cod}**")
+                        desc_curta = desc if len(
+                            desc) <= 45 else desc[:42] + "..."
+                        st.caption(desc_curta)
 
                         no_carrinho = cod in st.session_state['carrinho']
                         if no_carrinho:
-                            if st.button("❌ Remover", key=f"rem_{cod}", use_container_width=True):
+                            if st.button("❌ Remover", key=f"btn_rem_{cod}", use_container_width=True):
                                 del st.session_state['carrinho'][cod]
                                 st.rerun()
                         else:
-                            if st.button("➕ Adicionar", key=f"add_{cod}", type="primary", use_container_width=True):
+                            if st.button("➕ Adicionar", key=f"btn_add_{cod}", type="primary", use_container_width=True):
                                 st.session_state['carrinho'][cod] = {
                                     'Código': cod,
-                                    'Descrição': desc
+                                    'Descrição': desc,
+                                    'ImgPath': img_path
                                 }
                                 st.rerun()
+
+    # Controles de Paginação no Rodapé
+    st.divider()
+    col_nav1_bot, col_nav2_bot, col_nav3_bot = st.columns([1, 2, 1])
+    with col_nav1_bot:
+        st.button("⬅️ Página Anterior ", key="ant_bot", on_click=pagina_anterior, disabled=(
+            pagina_atual == 1), use_container_width=True)
+    with col_nav2_bot:
+        st.markdown(
+            f"<h4 style='text-align: center;'>Página {pagina_atual} de {total_paginas}</h4>", unsafe_allow_html=True)
+    with col_nav3_bot:
+        st.button("Próxima Página ➡️ ", key="prox_bot", on_click=proxima_pagina, disabled=(
+            pagina_atual == total_paginas), use_container_width=True)
+
 else:
     st.warning("Nenhum produto encontrado com os filtros selecionados.")
+
+# ==========================================
+# LISTA DE PRODUTOS SELECIONADOS (LINHAS)
+# ==========================================
+st.divider()
+st.header("📋 Produtos no seu Carrinho")
+
+if len(st.session_state['carrinho']) > 0:
+    # Cabeçalho da tabela improvisada com colunas
+    c1, c2, c3, c4 = st.columns([1, 2, 6, 1])
+    c1.markdown("**Foto**")
+    c2.markdown("**Código**")
+    c3.markdown("**Descrição**")
+    c4.markdown("**Remover**")
+    st.divider()
+
+    for cod, prod in list(st.session_state['carrinho'].items()):
+        c1, c2, c3, c4 = st.columns([1, 2, 6, 1])
+
+        with c1:
+            img_path = prod.get('ImgPath')
+            if img_path and os.path.exists(img_path):
+                st.image(img_path, width=60)
+            else:
+                st.caption("Sem foto")
+
+        with c2:
+            st.markdown(
+                f"<div style='margin-top: 20px;'>{cod}</div>", unsafe_allow_html=True)
+
+        with c3:
+            st.markdown(
+                f"<div style='margin-top: 20px;'>{prod['Descrição']}</div>", unsafe_allow_html=True)
+
+        with c4:
+            st.markdown("<div style='margin-top: 15px;'></div>",
+                        unsafe_allow_html=True)
+            if st.button("❌", key=f"lista_rem_{cod}", help="Remover produto"):
+                del st.session_state['carrinho'][cod]
+                st.rerun()
+
+        st.markdown("<hr style='margin: 5px 0px; opacity: 0.3;'>",
+                    unsafe_allow_html=True)
+else:
+    st.info("Nenhum produto adicionado ainda. Escolha produtos na vitrine acima.")
