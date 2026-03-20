@@ -1566,22 +1566,55 @@ with tab1:
             c_bt, c_st, c_ig, c_ds, c_pr, c_co, c_fl, c_de, c_im, c_fi = st.columns(
                 [1.2, 0.9, 1.0, 2.2, 1.0, 1.3, 1.3, 1.3, 1.0, 1.3], vertical_alignment="center")
 
-            with c_bt:
-                b1, b2, b3, b4 = st.columns([1.2, 1, 1, 1])
-                with b1:
-                    st.session_state['produtos_selecionados'][i]['Levar'] = st.checkbox(
-                        "", key=f"chk_{u_id}")
-                with b2:
-                    if st.button("⬆️", key=f"up_{u_id}", type="tertiary"):
-                        mover_cima(i)
+        with c_bt:
+            # Primeira linha de ações (Checkbox, Subir, Descer, Excluir)
+            b1, b2, b3, b4 = st.columns([1.2, 1, 1, 1])
+            with b1:
+                st.session_state.produtos_selecionados[i]['Levar'] = st.checkbox(
+                    "", key=f"chk_{uid}")
+            with b2:
+                if st.button("⬆️", key=f"up_{uid}", type="tertiary"):
+                    mover_cima(i)
+                    st.rerun()
+            with b3:
+                if st.button("⬇️", key=f"dw_{uid}", type="tertiary"):
+                    mover_baixo(i)
+                    st.rerun()
+            with b4:
+                if st.button("❌", key=f"del_{uid}", type="tertiary"):
+                    deletar_item(i)
+                    st.rerun()
+
+            # Segunda linha de ações (Upload de imagem)
+            cod = normalizar_codigo_imagem(prod['Código'])
+            caminho_img = img_idx_global.get(cod)
+
+            # Um CSS local discreto para fazer o popover de upload ficar pequenino e caber bonito
+            st.markdown("""
+                <style>
+                div[data-testid="stPopover"] > button {
+                    padding: 0 !important;
+                    font-size: 10px !important;
+                    height: 24px !important;
+                    min-height: 24px !important;
+                    margin-top: -10px !important;
+                }
+                </style>
+            """, unsafe_allow_html=True)
+
+            if caminho_img and os.path.exists(caminho_img):
+                with st.popover("📤 Trocar", use_container_width=True):
+                    nova_img = st.file_uploader("", type=[
+                                                'png', 'jpg', 'jpeg', 'webp'], key=f"up_trocar_{uid}", label_visibility="collapsed")
+                    if nova_img and st.button("Salvar", key=f"btn_trocar_{uid}", type="primary"):
+                        salvar_imagem_upload(nova_img, cod)
                         st.rerun()
-                with b3:
-                    if st.button("⬇️", key=f"dw_{u_id}", type="tertiary"):
-                        mover_baixo(i)
-                        st.rerun()
-                with b4:
-                    if st.button("❌", key=f"del_{u_id}", type="tertiary"):
-                        deletar_item(i)
+            else:
+                with st.popover("📤 Subir", use_container_width=True):
+                    nova_img = st.file_uploader("", type=[
+                                                'png', 'jpg', 'jpeg', 'webp'], key=f"up_novo_{uid}", label_visibility="collapsed")
+                    if nova_img and st.button("Salvar", key=f"btn_novo_{uid}", type="primary"):
+                        salvar_imagem_upload(nova_img, cod)
                         st.rerun()
 
             with c_st:
@@ -1595,22 +1628,9 @@ with tab1:
             if caminho_img and os.path.exists(caminho_img):
                 st.image(caminho_img, width=45)
                 st.markdown(f"<a href='{url_google}' target='_blank' style='display:block; text-align:center; background-color:#f1f5f9; color:#475569; font-size:9px; font-weight:bold; padding:4px 0; border-radius:4px; text-decoration:none; margin-top:2px; border:1px solid #cbd5e1;'>🔄 Buscar</a>", unsafe_allow_html=True)
-
-                with st.popover("📤 Trocar", use_container_width=True):
-                    nova_img = st.file_uploader("", type=['png', 'jpg', 'jpeg', 'webp'], key=f"up_trocar_{uid}", label_visibility="collapsed")
-                    if nova_img and st.button("Salvar Troca", key=f"btn_trocar_{uid}", type="primary"):
-                        salvar_imagem_upload(nova_img, cod)
-                        st.rerun()
             else:
                 st.markdown("<div style='text-align:center; color:#ff4b4b; font-size:10px; font-weight:bold; line-height:1.2; padding-top:5px; padding-bottom:5px;'>❌<br>Sem Foto</div>", unsafe_allow_html=True)
                 st.markdown(f"<a href='{url_google}' target='_blank' style='display:block; text-align:center; background-color:#3b82f6; color:#ffffff; font-size:9px; font-weight:bold; padding:4px 0; border-radius:4px; text-decoration:none; margin-top:2px;'>🔍 Buscar</a>", unsafe_allow_html=True)
-
-                with st.popover("📤 Subir", use_container_width=True):
-                    nova_img = st.file_uploader("", type=['png', 'jpg', 'jpeg', 'webp'], key=f"up_novo_{uid}", label_visibility="collapsed")
-                    if nova_img and st.button("Salvar Imagem", key=f"btn_novo_{uid}", type="primary"):
-                        salvar_imagem_upload(nova_img, cod)
-                        st.rerun()
-
 
             with c_ds:
                 cod_base = normalizar_codigo_imagem(prod['Código'])
