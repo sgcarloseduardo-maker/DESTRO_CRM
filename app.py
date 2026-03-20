@@ -1547,9 +1547,9 @@ with tab1:
 
         img_idx_global = obter_indice_imagens()
 
-            for i, prod in enumerate(st.session_state.produtos_selecionados):
+    for i, prod in enumerate(st.session_state.produtos_selecionados):
         uid = prod['Código']
-        
+
         # Garante que as variáveis de sessão essenciais existam antes de renderizar as colunas
         if f"chk_{uid}" not in st.session_state:
             st.session_state[f"chk_{uid}"] = prod.get('Levar', True)
@@ -1577,7 +1577,8 @@ with tab1:
             # Primeira linha de ações
             b1, b2, b3, b4 = st.columns([1.2, 1, 1, 1])
             with b1:
-                st.session_state.produtos_selecionados[i]['Levar'] = st.checkbox("", key=f"chk_{uid}")
+                st.session_state.produtos_selecionados[i]['Levar'] = st.checkbox(
+                    "", key=f"chk_{uid}")
             with b2:
                 if st.button("⬆️", key=f"up_{uid}", type="tertiary"):
                     mover_cima(i)
@@ -1590,7 +1591,7 @@ with tab1:
                 if st.button("❌", key=f"del_{uid}", type="tertiary"):
                     deletar_item(i)
                     st.rerun()
-                    
+
             # CSS para encolher o popover e não alargar muito a coluna
             st.markdown("""
                 <style>
@@ -1603,17 +1604,19 @@ with tab1:
                 }
                 </style>
             """, unsafe_allow_html=True)
-            
+
             # Segunda linha de ações (Trocar/Subir imagem)
             if caminho_img and os.path.exists(caminho_img):
                 with st.popover("📤 Trocar", use_container_width=True):
-                    nova_img = st.file_uploader("", type=['png', 'jpg', 'jpeg', 'webp'], key=f"up_trocar_{uid}", label_visibility="collapsed")
+                    nova_img = st.file_uploader("", type=[
+                                                'png', 'jpg', 'jpeg', 'webp'], key=f"up_trocar_{uid}", label_visibility="collapsed")
                     if nova_img and st.button("Salvar Troca", key=f"btn_trocar_{uid}", type="primary"):
                         salvar_imagem_upload(nova_img, cod)
                         st.rerun()
             else:
                 with st.popover("📤 Subir", use_container_width=True):
-                    nova_img = st.file_uploader("", type=['png', 'jpg', 'jpeg', 'webp'], key=f"up_novo_{uid}", label_visibility="collapsed")
+                    nova_img = st.file_uploader("", type=[
+                                                'png', 'jpg', 'jpeg', 'webp'], key=f"up_novo_{uid}", label_visibility="collapsed")
                     if nova_img and st.button("Salvar Imagem", key=f"btn_novo_{uid}", type="primary"):
                         salvar_imagem_upload(nova_img, cod)
                         st.rerun()
@@ -1663,38 +1666,51 @@ with tab1:
             st.write(f"**{prod['Descrição']}**")
 
         with c_pr:
-            st.number_input("", format="%.2f", step=None, key=f"pr_{uid}", on_change=atualizar_valores_uid, args=(i, uid), label_visibility="collapsed")
+            st.number_input("", format="%.2f", step=None, key=f"pr_{uid}", on_change=atualizar_valores_uid, args=(
+                i, uid), label_visibility="collapsed")
 
         with c_co:
-            m_co, i_co, p_co = st.columns([0.7, 2.0, 0.7], gap="small", vertical_alignment="center")
-            m_co.button("➖", key=f"co_m_{uid}", type="tertiary", on_click=step_value, args=(uid, 'co_', -1.0))
-            i_co.number_input("", format="%.1f", step=0.1, key=f"co_{uid}", on_change=atualizar_valores_uid, args=(i, uid), label_visibility="collapsed")
-            p_co.button("➕", key=f"co_p_{uid}", type="tertiary", on_click=step_value, args=(uid, 'co_', 1.0))
+            m_co, i_co, p_co = st.columns(
+                [0.7, 2.0, 0.7], gap="small", vertical_alignment="center")
+            m_co.button("➖", key=f"co_m_{uid}", type="tertiary",
+                        on_click=step_value, args=(uid, 'co_', -1.0))
+            i_co.number_input("", format="%.1f", step=0.1, key=f"co_{uid}", on_change=atualizar_valores_uid, args=(
+                i, uid), label_visibility="collapsed")
+            p_co.button("➕", key=f"co_p_{uid}", type="tertiary",
+                        on_click=step_value, args=(uid, 'co_', 1.0))
 
         with c_fl:
-            m_fl, i_fl, p_fl = st.columns([0.7, 2.0, 0.7], gap="small", vertical_alignment="center")
-            m_fl.button("➖", key=f"fl_m_{uid}", type="tertiary", on_click=step_value, args=(uid, 'fl_', -1.0))
-            i_fl.number_input("", format="%.1f", step=0.1, key=f"fl_{uid}", on_change=atualizar_valores_uid, args=(i, uid), label_visibility="collapsed")
-            p_fl.button("➕", key=f"fl_p_{uid}", type="tertiary", on_click=step_value, args=(uid, 'fl_', 1.0))
+            m_fl, i_fl, p_fl = st.columns(
+                [0.7, 2.0, 0.7], gap="small", vertical_alignment="center")
+            m_fl.button("➖", key=f"fl_m_{uid}", type="tertiary",
+                        on_click=step_value, args=(uid, 'fl_', -1.0))
+            i_fl.number_input("", format="%.1f", step=0.1, key=f"fl_{uid}", on_change=atualizar_valores_uid, args=(
+                i, uid), label_visibility="collapsed")
+            p_fl.button("➕", key=f"fl_p_{uid}", type="tertiary",
+                        on_click=step_value, args=(uid, 'fl_', 1.0))
 
         with c_de:
-            m_de, i_de, p_de = st.columns([0.7, 2.0, 0.7], gap="small", vertical_alignment="center")
-            m_de.button("➖", key=f"de_m_{uid}", type="tertiary", on_click=step_value, args=(uid, 'de_', -1.0))
-            i_de.number_input("", format="%.1f", step=0.1, key=f"de_{uid}", on_change=atualizar_valores_uid, args=(i, uid), label_visibility="collapsed")
-            p_de.button("➕", key=f"de_p_{uid}", type="tertiary", on_click=step_value, args=(uid, 'de_', 1.0))
+            m_de, i_de, p_de = st.columns(
+                [0.7, 2.0, 0.7], gap="small", vertical_alignment="center")
+            m_de.button("➖", key=f"de_m_{uid}", type="tertiary",
+                        on_click=step_value, args=(uid, 'de_', -1.0))
+            i_de.number_input("", format="%.1f", step=0.1, key=f"de_{uid}", on_change=atualizar_valores_uid, args=(
+                i, uid), label_visibility="collapsed")
+            p_de.button("➕", key=f"de_p_{uid}", type="tertiary",
+                        on_click=step_value, args=(uid, 'de_', 1.0))
 
         with c_im:
             if prod.get('ST_Flag'):
                 st.markdown("<div style='color:#10b981; font-size:11px; font-weight:800; text-align:center; line-height:1.2; margin-bottom:-5px; padding-top:10px'>com S.T<br>Não Calcular</div>", unsafe_allow_html=True)
             else:
                 st.markdown("<div style='color:#ef4444; font-size:11px; font-weight:800; text-align:center; line-height:1.2; margin-bottom:-5px; padding-top:10px'>sem S.T<br>CALCULAR</div>", unsafe_allow_html=True)
-            st.checkbox("+10.1%", key=f"im_{uid}", on_change=atualizar_valores_uid, args=(i, uid))
+            st.checkbox(
+                "+10.1%", key=f"im_{uid}", on_change=atualizar_valores_uid, args=(i, uid))
 
         with c_fi:
             st.write(f"**R$ {prod['Preço Final']:.2f}**")
-            
-        st.markdown("---")
 
+        st.markdown("---")
 
         with btn1:
             if st.button("🚀 GERAR TABLOIDE (GRADE)", type="primary", use_container_width=True):
