@@ -20,17 +20,36 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# CSS para padronizar o tamanho das imagens na grade de produtos
+# CSS para padronizar o tamanho das imagens na grade de produtos e centralização na lista
 st.markdown("""
 <style>
+    /* CSS da grade de produtos (vitrine) */
     div[data-testid="stImage"] img {
         object-fit: contain;
         height: 180px;
         width: 100%;
         background-color: white;
     }
+    
+    /* CSS específico para as miniaturas do carrinho para forçar altura fixa e menor */
+    .carrinho-img img {
+        object-fit: contain !important;
+        height: 50px !important;
+        width: 50px !important;
+    }
+    
+    /* Centralização vertical dos textos no carrinho */
+    .carrinho-texto {
+        display: flex;
+        align-items: center;
+        height: 50px;
+        font-size: 14px;
+    }
 </style>
 """, unsafe_allow_html=True)
+
+# COPYRIGHT NO TOPO
+st.markdown("<div style='text-align: right; color: gray; font-size: 12px; margin-top: -40px; margin-bottom: 20px;'>Sistema elaborado por EDG ENGENHARIA REPRESENTAÇÕES LTDA</div>", unsafe_allow_html=True)
 
 # ==========================================
 # FUNÇÕES DE IMAGEM E DIRETÓRIOS
@@ -62,7 +81,7 @@ def obter_indice_imagens():
     return idx
 
 # ==========================================
-# CARREGAMENTO DOS DADOS (SIMPLIFICADO)
+# CARREGAMENTO DOS DADOS
 # ==========================================
 
 
@@ -141,7 +160,6 @@ def carregar_dados():
         df['Código'] = df[0].astype(str)
         df['Descrição'] = df[2].astype(str).str.strip("* ")
 
-        # Filtra linhas vazias
         df = df[(df['Descrição'].str.strip().str.lower() != 'nan')
                 & (df['Descrição'].str.strip() != '')]
 
@@ -165,7 +183,7 @@ def carregar_dados():
 df_raw = carregar_dados()
 
 # ==========================================
-# VARIÁVEIS DE SESSÃO E NAVEGAÇÃO
+# VARIÁVEIS DE SESSÃO
 # ==========================================
 if 'carrinho' not in st.session_state:
     st.session_state['carrinho'] = {}
@@ -187,7 +205,7 @@ def pagina_anterior():
         st.session_state['pagina_atual'] -= 1
 
 # ==========================================
-# GERAÇÃO DO PDF OTIMIZADO
+# GERAÇÃO DO PDF
 # ==========================================
 
 
@@ -204,13 +222,22 @@ def remover_fundo_branco(img: Image.Image) -> Image.Image:
     return img
 
 
+def rodape_pdf(canvas, doc):
+    canvas.saveState()
+    canvas.setFont('Helvetica', 8)
+    canvas.setFillColor(colors.gray)
+    canvas.drawString(
+        30, 20, "Sistema elaborado por EDG ENGENHARIA REPRESENTAÇÕES LTDA")
+    canvas.restoreState()
+
+
 def gerar_pdf_pedido(produtos_selecionados):
-    st.toast("📄 Gerando PDF de Pedido com imagens em alta qualidade...", icon="⏳")
+    st.toast("📄 Gerando PDF...", icon="⏳")
     img_idx = obter_indice_imagens()
     buffer = BytesIO()
 
     doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=30,
-                            leftMargin=30, topMargin=30, bottomMargin=30)
+                            leftMargin=30, topMargin=30, bottomMargin=40)
     styles = getSampleStyleSheet()
     elements = []
 
@@ -228,15 +255,13 @@ def gerar_pdf_pedido(produtos_selecionados):
         img_pdf = ""
         if img_path and os.path.exists(img_path):
             try:
-                # OTIMIZAÇÃO DE IMAGEM PARA PDF
                 img_pil = Image.open(img_path).convert("RGBA")
                 img_pil = remover_fundo_branco(img_pil)
                 bbox = img_pil.getbbox()
                 if bbox:
                     img_pil = img_pil.crop(bbox)
 
-                # Dimensão da imagem para a tabela com proporção real
-                img_pil.thumbnail((250, 250), Image.Resampling.LANCZOS)
+                img_pil.thumbnail((200, 200), Image.Resampling.LANCZOS)
 
                 bg = Image.new("RGB", img_pil.size, (255, 255, 255))
                 bg.paste(img_pil, mask=img_pil.split()[3])
@@ -245,9 +270,8 @@ def gerar_pdf_pedido(produtos_selecionados):
                 bg.save(temp_buffer, format="JPEG", quality=95)
                 temp_buffer.seek(0)
 
-                # ReportLab: tamanho proporcional sem forçar achatar a imagem
-                img_pdf = RLImage(temp_buffer, width=60,
-                                  height=60, kind='proportional')
+                img_pdf = RLImage(temp_buffer, width=45,
+                                  height=45, kind='proportional')
             except Exception as e:
                 img_pdf = "Sem Foto"
         else:
@@ -256,20 +280,16 @@ def gerar_pdf_pedido(produtos_selecionados):
         data.append([img_pdf, prod['Código'],
                     Paragraph(desc, styles['Normal'])])
 
-    # Ajuste: alturas de linha maiores (70) para acomodar a imagem em proporção real
-    t = Table(data, colWidths=[80, 100, 350], rowHeights=[
-              30] + [70] * len(produtos_selecionados))
+    t = Table(data, colWidths=[70, 100, 360], rowHeights=[
+              30] + [55] * len(produtos_selecionados))
     t.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#002D62")),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
-        ('TOPPADDING', (0, 0), (-1, 0), 6),
         ('BACKGROUND', (0, 1), (-1, -1), colors.white),
         ('GRID', (0, 0), (-1, -1), 1, colors.black),
-        # Espaçamento para não cortar as imagens na tabela
         ('LEFTPADDING', (0, 1), (0, -1), 5),
         ('RIGHTPADDING', (0, 1), (0, -1), 5),
         ('TOPPADDING', (0, 1), (0, -1), 5),
@@ -277,7 +297,8 @@ def gerar_pdf_pedido(produtos_selecionados):
     ]))
 
     elements.append(t)
-    doc.build(elements)
+
+    doc.build(elements, onFirstPage=rodape_pdf, onLaterPages=rodape_pdf)
 
     buffer.seek(0)
     return buffer
@@ -340,7 +361,6 @@ st.title("Catálogo de Produtos")
 if not df_filtrado.empty:
     img_idx_global = obter_indice_imagens()
 
-    # Exibir sempre 20 produtos (5 linhas e 4 colunas)
     itens_por_pagina = 20
     total_paginas = max(1, len(df_filtrado) // itens_por_pagina +
                         (1 if len(df_filtrado) % itens_por_pagina > 0 else 0))
@@ -350,7 +370,6 @@ if not df_filtrado.empty:
 
     pagina_atual = st.session_state['pagina_atual']
 
-    # Controles de Paginação no Topo
     st.divider()
     col_nav1, col_nav2, col_nav3 = st.columns([1, 2, 1])
     with col_nav1:
@@ -368,7 +387,6 @@ if not df_filtrado.empty:
     fim = inicio + itens_por_pagina
     df_exibir = df_filtrado.iloc[inicio:fim]
 
-    # Exibição da grade de produtos
     for i in range(0, len(df_exibir), 4):
         cols = st.columns(4)
         for j, col in enumerate(cols):
@@ -405,7 +423,6 @@ if not df_filtrado.empty:
                                 }
                                 st.rerun()
 
-    # Controles de Paginação no Rodapé
     st.divider()
     col_nav1_bot, col_nav2_bot, col_nav3_bot = st.columns([1, 2, 1])
     with col_nav1_bot:
@@ -422,46 +439,57 @@ else:
     st.warning("Nenhum produto encontrado com os filtros selecionados.")
 
 # ==========================================
-# LISTA DE PRODUTOS SELECIONADOS (LINHAS)
+# LISTA DE PRODUTOS SELECIONADOS (LINHAS COMPACTAS E ALINHADAS)
 # ==========================================
 st.divider()
 st.header("📋 Produtos no seu Carrinho")
 
 if len(st.session_state['carrinho']) > 0:
-    # Cabeçalho da tabela improvisada com colunas
+
+    # Cabeçalho
     c1, c2, c3, c4 = st.columns([1, 2, 6, 1])
     c1.markdown("**Foto**")
     c2.markdown("**Código**")
     c3.markdown("**Descrição**")
     c4.markdown("**Remover**")
-    st.divider()
+    st.markdown("<hr style='margin: 5px 0px;'>", unsafe_allow_html=True)
 
     for cod, prod in list(st.session_state['carrinho'].items()):
-        c1, c2, c3, c4 = st.columns([1, 2, 6, 1])
+        c1, c2, c3, c4 = st.columns([1, 2, 6, 1], gap="small")
 
+        # Coluna de Imagem (com classe CSS para manter proporção e tamanho fixo)
         with c1:
             img_path = prod.get('ImgPath')
             if img_path and os.path.exists(img_path):
-                st.image(img_path, width=60)
+                st.markdown(f"<div class='carrinho-img'>",
+                            unsafe_allow_html=True)
+                st.image(img_path)
+                st.markdown("</div>", unsafe_allow_html=True)
             else:
-                st.caption("Sem foto")
+                st.markdown(
+                    "<div class='carrinho-texto' style='color: gray; font-size: 11px;'>Sem foto</div>", unsafe_allow_html=True)
 
+        # Coluna Código (Centralizado verticalmente)
         with c2:
             st.markdown(
-                f"<div style='margin-top: 20px;'>{cod}</div>", unsafe_allow_html=True)
+                f"<div class='carrinho-texto'>{cod}</div>", unsafe_allow_html=True)
 
+        # Coluna Descrição (Centralizado verticalmente)
         with c3:
             st.markdown(
-                f"<div style='margin-top: 20px;'>{prod['Descrição']}</div>", unsafe_allow_html=True)
+                f"<div class='carrinho-texto'>{prod['Descrição']}</div>", unsafe_allow_html=True)
 
+        # Botão de Remover
         with c4:
-            st.markdown("<div style='margin-top: 15px;'></div>",
+            st.markdown("<div style='margin-top: 5px;'>",
                         unsafe_allow_html=True)
             if st.button("❌", key=f"lista_rem_{cod}", help="Remover produto"):
                 del st.session_state['carrinho'][cod]
                 st.rerun()
+            st.markdown("</div>", unsafe_allow_html=True)
 
-        st.markdown("<hr style='margin: 5px 0px; opacity: 0.3;'>",
-                    unsafe_allow_html=True)
+        # Linha separadora bem justa e fina
+        st.markdown(
+            "<hr style='margin: 0px 0px 5px 0px; opacity: 0.2;'>", unsafe_allow_html=True)
 else:
     st.info("Nenhum produto adicionado ainda. Escolha produtos na vitrine acima.")
