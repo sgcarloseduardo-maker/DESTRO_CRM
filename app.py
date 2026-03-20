@@ -1547,31 +1547,37 @@ with tab1:
 
         img_idx_global = obter_indice_imagens()
 
-        for i, prod in enumerate(st.session_state['produtos_selecionados']):
-            u_id = prod['Código']
-            if f"chk_{u_id}" not in st.session_state:
-                st.session_state[f"chk_{u_id}"] = prod.get('Levar', True)
-            if f"pr_{u_id}" not in st.session_state:
-                st.session_state[f"pr_{u_id}"] = float(prod['Preço Atual'])
-            if f"co_{u_id}" not in st.session_state:
-                st.session_state[f"co_{u_id}"] = float(prod['Comissão'])
-            if f"fl_{u_id}" not in st.session_state:
-                st.session_state[f"fl_{u_id}"] = float(prod['FLEX'])
-            if f"de_{u_id}" not in st.session_state:
-                st.session_state[f"de_{u_id}"] = float(prod['DESC'])
-            if f"im_{u_id}" not in st.session_state:
-                st.session_state[f"im_{u_id}"] = bool(
-                    prod.get('Imposto', False))
+            for i, prod in enumerate(st.session_state.produtos_selecionados):
+        uid = prod['Código']
+        
+        # Garante que as variáveis de sessão essenciais existam antes de renderizar as colunas
+        if f"chk_{uid}" not in st.session_state:
+            st.session_state[f"chk_{uid}"] = prod.get('Levar', True)
+        if f"pr_{uid}" not in st.session_state:
+            st.session_state[f"pr_{uid}"] = float(prod['Preço Atual'])
+        if f"co_{uid}" not in st.session_state:
+            st.session_state[f"co_{uid}"] = float(prod['Comissão'])
+        if f"fl_{uid}" not in st.session_state:
+            st.session_state[f"fl_{uid}"] = float(prod['FLEX'])
+        if f"de_{uid}" not in st.session_state:
+            st.session_state[f"de_{uid}"] = float(prod['DESC'])
+        if f"im_{uid}" not in st.session_state:
+            st.session_state[f"im_{uid}"] = bool(prod.get('Imposto', False))
 
-            c_bt, c_st, c_ig, c_ds, c_pr, c_co, c_fl, c_de, c_im, c_fi = st.columns(
-                [1.2, 0.9, 1.0, 2.2, 1.0, 1.3, 1.3, 1.3, 1.0, 1.3], vertical_alignment="center")
+        c_bt, c_st, c_ig, c_ds, c_pr, c_co, c_fl, c_de, c_im, c_fi = st.columns(
+            [1.2, 0.9, 1.0, 2.2, 1.0, 1.3, 1.3, 1.3, 1.0, 1.3],
+            vertical_alignment="center"
+        )
 
         with c_bt:
-            # Primeira linha de ações (Checkbox, Subir, Descer, Excluir)
+            # Re-identifica as variáveis locais de imagem para que fiquem disponíveis dentro da coluna
+            cod = normalizar_codigo_imagem(prod['Código'])
+            caminho_img = img_idx_global.get(cod)
+
+            # Primeira linha de ações
             b1, b2, b3, b4 = st.columns([1.2, 1, 1, 1])
             with b1:
-                st.session_state.produtos_selecionados[i]['Levar'] = st.checkbox(
-                    "", key=f"chk_{uid}")
+                st.session_state.produtos_selecionados[i]['Levar'] = st.checkbox("", key=f"chk_{uid}")
             with b2:
                 if st.button("⬆️", key=f"up_{uid}", type="tertiary"):
                     mover_cima(i)
@@ -1584,12 +1590,8 @@ with tab1:
                 if st.button("❌", key=f"del_{uid}", type="tertiary"):
                     deletar_item(i)
                     st.rerun()
-
-            # Segunda linha de ações (Upload de imagem)
-            cod = normalizar_codigo_imagem(prod['Código'])
-            caminho_img = img_idx_global.get(cod)
-
-            # Um CSS local discreto para fazer o popover de upload ficar pequenino e caber bonito
+                    
+            # CSS para encolher o popover e não alargar muito a coluna
             st.markdown("""
                 <style>
                 div[data-testid="stPopover"] > button {
@@ -1601,24 +1603,23 @@ with tab1:
                 }
                 </style>
             """, unsafe_allow_html=True)
-
+            
+            # Segunda linha de ações (Trocar/Subir imagem)
             if caminho_img and os.path.exists(caminho_img):
                 with st.popover("📤 Trocar", use_container_width=True):
-                    nova_img = st.file_uploader("", type=[
-                                                'png', 'jpg', 'jpeg', 'webp'], key=f"up_trocar_{uid}", label_visibility="collapsed")
-                    if nova_img and st.button("Salvar", key=f"btn_trocar_{uid}", type="primary"):
+                    nova_img = st.file_uploader("", type=['png', 'jpg', 'jpeg', 'webp'], key=f"up_trocar_{uid}", label_visibility="collapsed")
+                    if nova_img and st.button("Salvar Troca", key=f"btn_trocar_{uid}", type="primary"):
                         salvar_imagem_upload(nova_img, cod)
                         st.rerun()
             else:
                 with st.popover("📤 Subir", use_container_width=True):
-                    nova_img = st.file_uploader("", type=[
-                                                'png', 'jpg', 'jpeg', 'webp'], key=f"up_novo_{uid}", label_visibility="collapsed")
-                    if nova_img and st.button("Salvar", key=f"btn_novo_{uid}", type="primary"):
+                    nova_img = st.file_uploader("", type=['png', 'jpg', 'jpeg', 'webp'], key=f"up_novo_{uid}", label_visibility="collapsed")
+                    if nova_img and st.button("Salvar Imagem", key=f"btn_novo_{uid}", type="primary"):
                         salvar_imagem_upload(nova_img, cod)
                         st.rerun()
 
-            with c_st:
-                st.write(prod['Status'])
+        with c_st:
+            st.write(prod['Status'])
 
         with c_ig:
             cod = normalizar_codigo_imagem(prod['Código'])
@@ -1632,64 +1633,68 @@ with tab1:
                 st.markdown("<div style='text-align:center; color:#ff4b4b; font-size:10px; font-weight:bold; line-height:1.2; padding-top:5px; padding-bottom:5px;'>❌<br>Sem Foto</div>", unsafe_allow_html=True)
                 st.markdown(f"<a href='{url_google}' target='_blank' style='display:block; text-align:center; background-color:#3b82f6; color:#ffffff; font-size:9px; font-weight:bold; padding:4px 0; border-radius:4px; text-decoration:none; margin-top:2px;'>🔍 Buscar</a>", unsafe_allow_html=True)
 
-            with c_ds:
-                cod_base = normalizar_codigo_imagem(prod['Código'])
-                html_copy = f"""<html><body style="margin:0; padding:0; background:transparent; overflow:hidden;"><script>function copyText(text, btn) {{ if (navigator.clipboard) {{ navigator.clipboard.writeText(text); }} else {{ var t = document.createElement("textarea"); t.value = text; document.body.appendChild(t); t.select(); document.execCommand("Copy"); t.remove(); }} btn.innerText = '✔️ Copiado!'; setTimeout(() => btn.innerText = '📋 Copiar', 2000); }}</script><div style="font-family: sans-serif; display: flex; align-items: center; gap: 8px; margin-top:2px; margin-bottom:5px;"><span style="font-size: 13px; font-weight: bold; color: #64748b;">Cód: {cod_base}</span><button onclick="copyText('{cod_base}', this)" style="border: 1px solid #cbd5e1; background: #f8fafc; cursor: pointer; border-radius: 4px; font-size: 10px; padding: 2px 6px; color: #475569; transition: 0.2s;">📋 Copiar</button></div></body></html>"""
-                st.components.v1.html(html_copy, height=25)
-                st.write(f"**{prod['Descrição']}**")
+        with c_ds:
+            cod_base = normalizar_codigo_imagem(prod['Código'])
+            html_copy = f"""
+            <html><body style="margin:0; padding:0; background:transparent; overflow:hidden;">
+            <script>
+            function copyText(text, btn) {{
+                if (navigator.clipboard) {{
+                    navigator.clipboard.writeText(text);
+                }} else {{
+                    var t = document.createElement("textarea");
+                    t.value = text;
+                    document.body.appendChild(t);
+                    t.select();
+                    document.execCommand("Copy");
+                    t.remove();
+                }}
+                btn.innerText = "Copiado!";
+                setTimeout(() => {{ btn.innerText = "Copiar"; }}, 2000);
+            }}
+            </script>
+            <div style="font-family: sans-serif; display: flex; align-items: center; gap: 8px; margin-top:2px; margin-bottom:5px;">
+                <span style="font-size: 13px; font-weight: bold; color: #64748b;">Cód: {cod_base}</span>
+                <button onclick="copyText('{cod_base}', this)" style="border: 1px solid #cbd5e1; background: #f8fafc; cursor: pointer; border-radius: 4px; font-size: 10px; padding: 2px 6px; color: #475569; transition: 0.2s;">Copiar</button>
+            </div>
+            </body></html>
+            """
+            st.components.v1.html(html_copy, height=25)
+            st.write(f"**{prod['Descrição']}**")
 
-            with c_pr:
-                st.number_input("", format="%.2f", step=None, key=f"pr_{u_id}", on_change=atualizar_valores_uid, args=(
-                    i, u_id), label_visibility="collapsed")
+        with c_pr:
+            st.number_input("", format="%.2f", step=None, key=f"pr_{uid}", on_change=atualizar_valores_uid, args=(i, uid), label_visibility="collapsed")
 
-            with c_co:
-                m_co, i_co, p_co = st.columns(
-                    [0.7, 2.0, 0.7], gap="small", vertical_alignment="center")
-                m_co.button("➖", key=f"co_m_{u_id}", type="tertiary", on_click=step_value, args=(
-                    u_id, "co", -1.0))
-                i_co.number_input("", format="%.1f", step=0.1, key=f"co_{u_id}", on_change=atualizar_valores_uid, args=(
-                    i, u_id), label_visibility="collapsed")
-                p_co.button("➕", key=f"co_p_{u_id}", type="tertiary", on_click=step_value, args=(
-                    u_id, "co", 1.0))
+        with c_co:
+            m_co, i_co, p_co = st.columns([0.7, 2.0, 0.7], gap="small", vertical_alignment="center")
+            m_co.button("➖", key=f"co_m_{uid}", type="tertiary", on_click=step_value, args=(uid, 'co_', -1.0))
+            i_co.number_input("", format="%.1f", step=0.1, key=f"co_{uid}", on_change=atualizar_valores_uid, args=(i, uid), label_visibility="collapsed")
+            p_co.button("➕", key=f"co_p_{uid}", type="tertiary", on_click=step_value, args=(uid, 'co_', 1.0))
 
-            with c_fl:
-                m_fl, i_fl, p_fl = st.columns(
-                    [0.7, 2.0, 0.7], gap="small", vertical_alignment="center")
-                m_fl.button("➖", key=f"fl_m_{u_id}", type="tertiary", on_click=step_value, args=(
-                    u_id, "fl", -1.0))
-                i_fl.number_input("", format="%.1f", step=0.1, key=f"fl_{u_id}", on_change=atualizar_valores_uid, args=(
-                    i, u_id), label_visibility="collapsed")
-                p_fl.button("➕", key=f"fl_p_{u_id}", type="tertiary", on_click=step_value, args=(
-                    u_id, "fl", 1.0))
+        with c_fl:
+            m_fl, i_fl, p_fl = st.columns([0.7, 2.0, 0.7], gap="small", vertical_alignment="center")
+            m_fl.button("➖", key=f"fl_m_{uid}", type="tertiary", on_click=step_value, args=(uid, 'fl_', -1.0))
+            i_fl.number_input("", format="%.1f", step=0.1, key=f"fl_{uid}", on_change=atualizar_valores_uid, args=(i, uid), label_visibility="collapsed")
+            p_fl.button("➕", key=f"fl_p_{uid}", type="tertiary", on_click=step_value, args=(uid, 'fl_', 1.0))
 
-            with c_de:
-                m_de, i_de, p_de = st.columns(
-                    [0.7, 2.0, 0.7], gap="small", vertical_alignment="center")
-                m_de.button("➖", key=f"de_m_{u_id}", type="tertiary", on_click=step_value, args=(
-                    u_id, "de", -1.0))
-                i_de.number_input("", format="%.1f", step=0.1, key=f"de_{u_id}", on_change=atualizar_valores_uid, args=(
-                    i, u_id), label_visibility="collapsed")
-                p_de.button("➕", key=f"de_p_{u_id}", type="tertiary", on_click=step_value, args=(
-                    u_id, "de", 1.0))
+        with c_de:
+            m_de, i_de, p_de = st.columns([0.7, 2.0, 0.7], gap="small", vertical_alignment="center")
+            m_de.button("➖", key=f"de_m_{uid}", type="tertiary", on_click=step_value, args=(uid, 'de_', -1.0))
+            i_de.number_input("", format="%.1f", step=0.1, key=f"de_{uid}", on_change=atualizar_valores_uid, args=(i, uid), label_visibility="collapsed")
+            p_de.button("➕", key=f"de_p_{uid}", type="tertiary", on_click=step_value, args=(uid, 'de_', 1.0))
 
-            with c_im:
-                if prod.get('ST_Flag') == '*':
-                    st.markdown("<div style='color:#10b981; font-size:11px; font-weight:800; text-align:center; line-height:1.2; margin-bottom:-5px; padding-top:10px;'>com S.T<br>Não Calcular</div>", unsafe_allow_html=True)
-                else:
-                    st.markdown("<div style='color:#ef4444; font-size:11px; font-weight:800; text-align:center; line-height:1.2; margin-bottom:-5px; padding-top:10px;'>sem S.T<br>CALCULAR</div>", unsafe_allow_html=True)
-                st.checkbox(
-                    "+10.1%", key=f"im_{u_id}", on_change=atualizar_valores_uid, args=(i, u_id))
+        with c_im:
+            if prod.get('ST_Flag'):
+                st.markdown("<div style='color:#10b981; font-size:11px; font-weight:800; text-align:center; line-height:1.2; margin-bottom:-5px; padding-top:10px'>com S.T<br>Não Calcular</div>", unsafe_allow_html=True)
+            else:
+                st.markdown("<div style='color:#ef4444; font-size:11px; font-weight:800; text-align:center; line-height:1.2; margin-bottom:-5px; padding-top:10px'>sem S.T<br>CALCULAR</div>", unsafe_allow_html=True)
+            st.checkbox("+10.1%", key=f"im_{uid}", on_change=atualizar_valores_uid, args=(i, uid))
 
-            with c_fi:
-                st.write(f"### R$ {prod['Preço Final']:.2f}")
-            st.markdown("---")
+        with c_fi:
+            st.write(f"**R$ {prod['Preço Final']:.2f}**")
+            
+        st.markdown("---")
 
-    vazio_esq, col_central, vazio_dir = st.columns([1, 5, 1])
-    with col_central:
-        opt_grade = st.session_state.get("sel_grade", "Layout 1")
-        n_layout = st.session_state.get('num_produtos_layout', 0)
-
-        btn1, btn2, btn3 = st.columns(3)
 
         with btn1:
             if st.button("🚀 GERAR TABLOIDE (GRADE)", type="primary", use_container_width=True):
