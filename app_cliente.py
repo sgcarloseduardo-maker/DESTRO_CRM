@@ -9,6 +9,7 @@ from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Image as RLImage, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib import colors
+from datetime import datetime
 
 # ==========================================
 # CONFIGURAÇÃO DA PÁGINA E CSS
@@ -34,16 +35,22 @@ st.markdown("""
     /* CSS específico para as miniaturas do carrinho para forçar altura fixa e menor */
     .carrinho-img img {
         object-fit: contain !important;
-        height: 50px !important;
-        width: 50px !important;
+        height: 35px !important;
+        width: 35px !important;
     }
     
     /* Centralização vertical dos textos no carrinho */
     .carrinho-texto {
         display: flex;
         align-items: center;
-        height: 50px;
-        font-size: 14px;
+        height: 35px;
+        font-size: 13px;
+    }
+    
+    .linha-separadora {
+        margin: 5px 0px 5px 0px; 
+        border: 0; 
+        border-top: 2px solid #94a3b8; /* Linha mais espessa e mais escura */
     }
 </style>
 """, unsafe_allow_html=True)
@@ -81,7 +88,7 @@ def obter_indice_imagens():
     return idx
 
 # ==========================================
-# CARREGAMENTO DOS DADOS
+# CARREGAMENTO DOS DADOS E SINÔNIMOS
 # ==========================================
 
 
@@ -99,6 +106,54 @@ def manter_categoria_completa(txt):
     if s.lower() == "nan" or s == "":
         return ""
     return s
+
+
+def mapear_sinonimos(desc):
+    desc_up = desc.upper()
+    sinonimos = []
+
+    # Mapeamentos comuns baseados em abreviações do atacado
+    if 'P HIG' in desc_up or 'PAPEL HIG' in desc_up or 'P.HIG' in desc_up:
+        sinonimos.append('PAPEL HIGIÊNICO')
+    if 'LIMP VD' in desc_up or 'LIMP.VD' in desc_up:
+        sinonimos.append('LIMPA VIDROS')
+    if 'DET ' in desc_up or 'DETERG ' in desc_up:
+        sinonimos.append('DETERGENTE')
+    if 'ALC ' in desc_up or 'ALC.' in desc_up:
+        sinonimos.append('ÁLCOOL')
+    if 'DESINF ' in desc_up or 'DESINF.' in desc_up:
+        sinonimos.append('DESINFETANTE')
+    if 'SAB ' in desc_up or 'SAB.' in desc_up:
+        sinonimos.append('SABÃO SABONETE')
+    if 'COND ' in desc_up or 'COND.' in desc_up:
+        sinonimos.append('CONDICIONADOR')
+    if 'SHAMP ' in desc_up or 'SH ' in desc_up:
+        sinonimos.append('SHAMPOO')
+    if 'AMAC ' in desc_up or 'AMAC.' in desc_up:
+        sinonimos.append('AMACIANTE')
+    if 'PAP TOA' in desc_up:
+        sinonimos.append('PAPEL TOALHA')
+    if 'CR DENT' in desc_up or 'CREME DENT' in desc_up:
+        sinonimos.append('CREME DENTAL PASTA DE DENTE')
+    if 'ESCOVA DENT' in desc_up or 'ESC DENT' in desc_up:
+        sinonimos.append('ESCOVA DE DENTE')
+    if 'APAR BARBA' in desc_up or 'AP BARBA' in desc_up:
+        sinonimos.append('APARELHO DE BARBEAR PRESTOBARBA GILETTE')
+    if 'ABS ' in desc_up or 'ABSORV ' in desc_up:
+        sinonimos.append('ABSORVENTE')
+    if 'FRAL ' in desc_up or 'FRALD ' in desc_up:
+        sinonimos.append('FRALDA')
+    if 'DESOD ' in desc_up or 'DESODOR ' in desc_up:
+        sinonimos.append('DESODORANTE')
+    if 'LIMP MULT' in desc_up:
+        sinonimos.append('LIMPADOR MULTIUSO')
+    if 'AG SANIT' in desc_up or 'AG.SANIT' in desc_up:
+        sinonimos.append('ÁGUA SANITÁRIA CÂNDIDA')
+
+    if sinonimos:
+        # Adiciona o sinônimo discretamente entre colchetes para o motor de busca achar
+        return desc + " [" + ", ".join(sinonimos) + "]"
+    return desc
 
 
 @st.cache_data
@@ -191,6 +246,9 @@ if 'carrinho' not in st.session_state:
 if 'pagina_atual' not in st.session_state:
     st.session_state['pagina_atual'] = 1
 
+if 'busca_manual' not in st.session_state:
+    st.session_state['busca_manual'] = None
+
 
 def resetar_pagina():
     st.session_state['pagina_atual'] = 1
@@ -232,7 +290,6 @@ def rodape_pdf(canvas, doc):
 
 
 def gerar_pdf_pedido(produtos_selecionados):
-    st.toast("📄 Gerando PDF...", icon="⏳")
     img_idx = obter_indice_imagens()
     buffer = BytesIO()
 
@@ -243,7 +300,12 @@ def gerar_pdf_pedido(produtos_selecionados):
 
     title = Paragraph("<b>Meu Pedido de Produtos</b>", styles['Title'])
     elements.append(title)
-    elements.append(Spacer(1, 20))
+
+    # Adicionando a Data atual no topo
+    data_atual = datetime.now().strftime("%d/%m/%Y às %H:%M")
+    elements.append(
+        Paragraph(f"<b>Data do Pedido:</b> {data_atual}", styles['Normal']))
+    elements.append(Spacer(1, 15))
 
     data = [["Foto", "Código", "Descrição"]]
 
@@ -321,7 +383,7 @@ with st.sidebar:
         pdf_buffer = gerar_pdf_pedido(carrinho_lista)
         if pdf_buffer:
             st.download_button(
-                label="📥 Baixar PDF do Pedido",
+                label="📥 Baixar PDF",
                 data=pdf_buffer,
                 file_name="Meu_Pedido.pdf",
                 mime="application/pdf",
@@ -356,11 +418,46 @@ with st.sidebar:
         if categoria_f != 'Todas':
             df_filtrado = df_filtrado[df_filtrado['Categoria'] == categoria_f]
 
+img_idx_global = obter_indice_imagens()
+
 st.title("Catálogo de Produtos")
 
-if not df_filtrado.empty:
-    img_idx_global = obter_indice_imagens()
+# ==========================================
+# CAMPO DE BUSCA MANUAL
+# ==========================================
+st.markdown("<h3>Selecionar Produtos Manualmente</h3>", unsafe_allow_html=True)
 
+if not df_filtrado.empty:
+    # Cria uma coluna virtual com a sintaxe: "Código - Descrição [Sinônimos]"
+    df_filtrado['Opcao_Busca'] = df_filtrado.apply(
+        lambda x: f"{x['Código']} - {mapear_sinonimos(x['Descrição'])}", axis=1)
+
+    def processar_busca_manual():
+        val = st.session_state.busca_manual
+        if val:
+            cod = val.split(" - ")[0].strip()
+            row = df_filtrado[df_filtrado['Código'] == cod].iloc[0]
+            st.session_state['carrinho'][cod] = {
+                'Código': cod,
+                'Descrição': row['Descrição'],
+                'ImgPath': img_idx_global.get(normalizar_codigo_imagem(cod))
+            }
+            # Limpa o selectbox
+            st.session_state.busca_manual = None
+
+    st.selectbox(
+        "Selecionar Produtos pelo Nome ou Código",
+        options=df_filtrado['Opcao_Busca'].tolist(),
+        index=None,
+        placeholder="Digite o nome do produto ou o código interno...",
+        key="busca_manual",
+        on_change=processar_busca_manual,
+        label_visibility="collapsed"
+    )
+
+    st.divider()
+
+    # Exibição do Catálogo
     itens_por_pagina = 20
     total_paginas = max(1, len(df_filtrado) // itens_por_pagina +
                         (1 if len(df_filtrado) % itens_por_pagina > 0 else 0))
@@ -370,7 +467,6 @@ if not df_filtrado.empty:
 
     pagina_atual = st.session_state['pagina_atual']
 
-    st.divider()
     col_nav1, col_nav2, col_nav3 = st.columns([1, 2, 1])
     with col_nav1:
         st.button("⬅️ Página Anterior", on_click=pagina_anterior,
@@ -439,7 +535,7 @@ else:
     st.warning("Nenhum produto encontrado com os filtros selecionados.")
 
 # ==========================================
-# LISTA DE PRODUTOS SELECIONADOS (LINHAS COMPACTAS E ALINHADAS)
+# LISTA DE PRODUTOS SELECIONADOS
 # ==========================================
 st.divider()
 st.header("📋 Produtos no seu Carrinho")
@@ -452,12 +548,11 @@ if len(st.session_state['carrinho']) > 0:
     c2.markdown("**Código**")
     c3.markdown("**Descrição**")
     c4.markdown("**Remover**")
-    st.markdown("<hr style='margin: 5px 0px;'>", unsafe_allow_html=True)
+    st.markdown("<hr class='linha-separadora'>", unsafe_allow_html=True)
 
     for cod, prod in list(st.session_state['carrinho'].items()):
         c1, c2, c3, c4 = st.columns([1, 2, 6, 1], gap="small")
 
-        # Coluna de Imagem (com classe CSS para manter proporção e tamanho fixo)
         with c1:
             img_path = prod.get('ImgPath')
             if img_path and os.path.exists(img_path):
@@ -469,17 +564,14 @@ if len(st.session_state['carrinho']) > 0:
                 st.markdown(
                     "<div class='carrinho-texto' style='color: gray; font-size: 11px;'>Sem foto</div>", unsafe_allow_html=True)
 
-        # Coluna Código (Centralizado verticalmente)
         with c2:
             st.markdown(
                 f"<div class='carrinho-texto'>{cod}</div>", unsafe_allow_html=True)
 
-        # Coluna Descrição (Centralizado verticalmente)
         with c3:
             st.markdown(
                 f"<div class='carrinho-texto'>{prod['Descrição']}</div>", unsafe_allow_html=True)
 
-        # Botão de Remover
         with c4:
             st.markdown("<div style='margin-top: 5px;'>",
                         unsafe_allow_html=True)
@@ -488,8 +580,24 @@ if len(st.session_state['carrinho']) > 0:
                 st.rerun()
             st.markdown("</div>", unsafe_allow_html=True)
 
-        # Linha separadora bem justa e fina
-        st.markdown(
-            "<hr style='margin: 0px 0px 5px 0px; opacity: 0.2;'>", unsafe_allow_html=True)
+        # Linha separadora entre itens, mais marcante
+        st.markdown("<hr class='linha-separadora'>", unsafe_allow_html=True)
+
+    # Botão Extra de Download no Fim da Lista
+    st.markdown("<br>", unsafe_allow_html=True)
+    c_espaco, c_botao, c_espaco2 = st.columns([3, 2, 3])
+    with c_botao:
+        pdf_buffer_fim = gerar_pdf_pedido(
+            list(st.session_state['carrinho'].values()))
+        st.download_button(
+            label="📥 BAIXAR PDF DO PEDIDO",
+            data=pdf_buffer_fim,
+            file_name="Meu_Pedido.pdf",
+            mime="application/pdf",
+            type="primary",
+            use_container_width=True,
+            key="botao_baixar_rodape"
+        )
 else:
-    st.info("Nenhum produto adicionado ainda. Escolha produtos na vitrine acima.")
+    st.info(
+        "Nenhum produto adicionado ainda. Escolha produtos na vitrine ou na busca acima.")
