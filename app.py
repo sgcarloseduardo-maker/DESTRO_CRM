@@ -1592,36 +1592,25 @@ with tab1:
             caminho_img = img_idx_global.get(cod)
             url_google = f"https://www.google.com/search?tbm=isch&q={urllib.parse.quote(prod['Descrição'])}"
 
-            # Removemos a quebra de 2 colunas e voltamos para uma renderização empilhada vertical,
-            # para não ter problema de falta de espaço
-
             if caminho_img and os.path.exists(caminho_img):
                 st.image(caminho_img, width=45)
-
-                # Botão de Busca (estilo leve)
                 st.markdown(f"<a href='{url_google}' target='_blank' style='display:block; text-align:center; background-color:#f1f5f9; color:#475569; font-size:9px; font-weight:bold; padding:4px 0; border-radius:4px; text-decoration:none; margin-top:2px; border:1px solid #cbd5e1;'>🔄 Buscar</a>", unsafe_allow_html=True)
 
-                # Popover de Troca
                 with st.popover("📤 Trocar", use_container_width=True):
-                    nova_img = st.file_uploader("Nova foto:", type=[
-                                                'png', 'jpg', 'jpeg', 'webp'], key=f"up_trocar_{uid}", label_visibility="collapsed")
+                    nova_img = st.file_uploader("", type=['png', 'jpg', 'jpeg', 'webp'], key=f"up_trocar_{uid}", label_visibility="collapsed")
                     if nova_img and st.button("Salvar Troca", key=f"btn_trocar_{uid}", type="primary"):
                         salvar_imagem_upload(nova_img, cod)
                         st.rerun()
-
             else:
                 st.markdown("<div style='text-align:center; color:#ff4b4b; font-size:10px; font-weight:bold; line-height:1.2; padding-top:5px; padding-bottom:5px;'>❌<br>Sem Foto</div>", unsafe_allow_html=True)
-
-                # Botão de Busca (estilo azul forte)
                 st.markdown(f"<a href='{url_google}' target='_blank' style='display:block; text-align:center; background-color:#3b82f6; color:#ffffff; font-size:9px; font-weight:bold; padding:4px 0; border-radius:4px; text-decoration:none; margin-top:2px;'>🔍 Buscar</a>", unsafe_allow_html=True)
 
-                # Popover de Subir Imagem
                 with st.popover("📤 Subir", use_container_width=True):
-                    nova_img = st.file_uploader("Fazer upload:", type=[
-                                                'png', 'jpg', 'jpeg', 'webp'], key=f"up_novo_{uid}", label_visibility="collapsed")
+                    nova_img = st.file_uploader("", type=['png', 'jpg', 'jpeg', 'webp'], key=f"up_novo_{uid}", label_visibility="collapsed")
                     if nova_img and st.button("Salvar Imagem", key=f"btn_novo_{uid}", type="primary"):
                         salvar_imagem_upload(nova_img, cod)
                         st.rerun()
+
 
             with c_ds:
                 cod_base = normalizar_codigo_imagem(prod['Código'])
