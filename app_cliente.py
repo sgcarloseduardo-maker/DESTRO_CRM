@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import re
 import os
+import base64
 from io import BytesIO
 from PIL import Image
 from reportlab.lib.pagesizes import letter
@@ -21,7 +22,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# CSS para layout do carrinho ULTRA compacto e centralizado (linhas reduzidas pela metade)
+# CSS para a vitrine e tabela compacta do carrinho
 st.markdown("""
 <style>
     div[data-testid="stImage"] img {
@@ -31,63 +32,44 @@ st.markdown("""
         background-color: white;
     }
     
-    /* Remove padding e margin internos das colunas na seção compacta */
-    .compact-row div[data-testid="column"] {
-        padding: 0px !important;
+    /* Configurações da Tabela HTML do Carrinho */
+    .tabela-carrinho {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 11px;
+        font-weight: bold;
+    }
+    
+    .tabela-carrinho th {
+        text-align: center;
+        padding: 4px;
+        border-bottom: 2px solid #94a3b8;
+        font-size: 13px;
+    }
+    
+    .tabela-carrinho td {
+        text-align: center;
+        padding: 0px !important; /* Zero padding para colar a linha */
         margin: 0px !important;
-        min-height: auto !important;
+        border-bottom: 1px solid #cbd5e1;
+        height: 20px; /* Altura final real da linha travada */
+        vertical-align: middle;
     }
     
-    /* Configuração da miniatura com altura reduzida pela metade */
-    .carrinho-img img {
-        object-fit: contain !important;
-        height: 12px !important;
-        width: 12px !important;
-        margin: 0 auto !important;
+    .tabela-carrinho img {
+        height: 18px; /* Imagem acompanhando o tamanho da linha */
+        width: 18px;
+        object-fit: contain;
+        vertical-align: middle;
     }
     
-    /* Textos com altura ultra espremida e fonte menor */
-    .carrinho-texto {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        height: 12px;            /* Metade da altura anterior */
-        font-size: 10px;         /* Fonte reduzida para caber na linha */
-        font-weight: bold;       
-        margin: 0 !important;
+    /* Remover padding extra dos botões de exclusão nas colunas de apoio */
+    div[data-testid="column"] button {
         padding: 0 !important;
-        line-height: 1 !important;
-    }
-    
-    /* Div do botão reduzida */
-    .carrinho-btn {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        height: 12px;
-    }
-    
-    /* Espreme o botão padrão do streamlit ao máximo */
-    .carrinho-btn button {
-        min-height: 10px !important;
-        height: 10px !important;
-        padding: 0px 4px !important;
-        line-height: 1 !important;
-        font-size: 8px !important;
         margin: 0 !important;
-    }
-
-    /* Linha divisória super colada e mais fina */
-    .linha-separadora {
-        margin: 0px !important; 
-        border: 0; 
-        border-top: 1px solid #cbd5e1;
-    }
-    
-    /* Remove todos os espaços extras gerados por marcações de texto vazias no Streamlit */
-    .compact-row p {
-        margin: 0 !important;
-        padding: 0 !important;
+        height: 20px !important;
+        min-height: 20px !important;
+        font-size: 10px !important;
         line-height: 1 !important;
     }
 </style>
@@ -124,6 +106,13 @@ def obter_indice_imagens():
                 if num:
                     idx[num] = os.path.join(root, fn)
     return idx
+
+
+def imagem_para_base64(img_path):
+    if img_path and os.path.exists(img_path):
+        with open(img_path, "rb") as image_file:
+            return base64.b64encode(image_file.read()).decode()
+    return None
 
 # ==========================================
 # CARREGAMENTO DOS DADOS E SINÔNIMOS
@@ -568,60 +557,57 @@ else:
     st.warning("Nenhum produto encontrado com os filtros selecionados.")
 
 # ==========================================
-# LISTA DE PRODUTOS SELECIONADOS - VISUAL ULTRA COMPACTO
+# LISTA DE PRODUTOS SELECIONADOS - VISUAL HTML ULTRA COMPACTO
 # ==========================================
 st.divider()
 st.header("📋 Produtos no seu Carrinho")
 
 if len(st.session_state['carrinho']) > 0:
 
-    # Cabeçalho Centralizado
-    st.markdown("""
-        <div style='display: flex; font-weight: bold; margin-bottom: 5px; font-size: 14px;'>
-            <div style='width: 10%; text-align: center;'>Foto</div>
-            <div style='width: 20%; text-align: center;'>Código</div>
-            <div style='width: 60%; text-align: center;'>Descrição</div>
-            <div style='width: 10%; text-align: center;'>Remover</div>
-        </div>
-        <hr class='linha-separadora'>
-    """, unsafe_allow_html=True)
+    # Vamos usar colunas do st apenas para separar a tabela dos botões de exclusão que precisam de ação Python
+    c_tab, c_btn = st.columns([9, 1])
 
-    # Container sem padding
-    st.markdown('<div class="compact-row">', unsafe_allow_html=True)
+    with c_tab:
+        # Iniciamos a string HTML da tabela
+        tabela_html = """
+        <table class='tabela-carrinho'>
+            <tr>
+                <th style='width: 15%;'>Foto</th>
+                <th style='width: 25%;'>Código</th>
+                <th style='width: 60%;'>Descrição</th>
+            </tr>
+        """
 
-    for cod, prod in list(st.session_state['carrinho'].items()):
-        c1, c2, c3, c4 = st.columns([1, 2, 6, 1])
-
-        with c1:
+        for cod, prod in list(st.session_state['carrinho'].items()):
             img_path = prod.get('ImgPath')
-            if img_path and os.path.exists(img_path):
-                st.markdown(
-                    f"<div class='carrinho-img' style='display:flex; justify-content:center;'>", unsafe_allow_html=True)
-                st.image(img_path)
-                st.markdown("</div>", unsafe_allow_html=True)
-            else:
-                st.markdown(
-                    "<div class='carrinho-texto' style='color: gray; font-size: 8px; font-weight: normal;'>Sem foto</div>", unsafe_allow_html=True)
+            base64_img = imagem_para_base64(img_path)
 
-        with c2:
-            st.markdown(
-                f"<div class='carrinho-texto'>{cod}</div>", unsafe_allow_html=True)
+            img_tag = f"<img src='data:image/jpeg;base64,{base64_img}'>" if base64_img else "<span style='color: gray; font-size: 8px;'>Sem foto</span>"
 
-        with c3:
-            st.markdown(
-                f"<div class='carrinho-texto'>{prod['Descrição']}</div>", unsafe_allow_html=True)
+            linha = f"""
+            <tr>
+                <td>{img_tag}</td>
+                <td>{cod}</td>
+                <td>{prod['Descrição']}</td>
+            </tr>
+            """
+            tabela_html += linha
 
-        with c4:
-            st.markdown("<div class='carrinho-btn'>", unsafe_allow_html=True)
-            if st.button("❌", key=f"lista_rem_{cod}", help="Remover produto"):
+        tabela_html += "</table>"
+
+        # Renderiza a tabela HTML inteira espremida
+        st.markdown(tabela_html, unsafe_allow_html=True)
+
+    with c_btn:
+        # Colocamos os botões de remover alinhados com a altura de cada linha da tabela
+        # Usamos markdown no topo para compensar a altura do cabeçalho da tabela (Header)
+        st.markdown("<div style='height: 30px;'></div>",
+                    unsafe_allow_html=True)
+
+        for cod in list(st.session_state['carrinho'].keys()):
+            if st.button("🗑️", key=f"lista_rem_{cod}", help="Remover", use_container_width=True):
                 del st.session_state['carrinho'][cod]
                 st.rerun()
-            st.markdown("</div>", unsafe_allow_html=True)
-
-        # Linha separadora logo abaixo de cada item
-        st.markdown("<hr class='linha-separadora'>", unsafe_allow_html=True)
-
-    st.markdown('</div>', unsafe_allow_html=True)
 
     # BOTOES NO FINAL (Baixar PDF e Limpar Carrinho)
     st.markdown("<br>", unsafe_allow_html=True)
