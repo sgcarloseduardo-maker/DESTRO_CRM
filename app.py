@@ -823,7 +823,7 @@ def gerar_pdf_planilha(df_produtos):
         c.setFont("Helvetica-Bold", 14)
         c.setFillColor(colors.HexColor("#002D62"))
         c.drawString(margem_esq, page_height -
-                     margem_top, "Tabela de Produtos")
+                     margem_top, f"Tabela de Produtos - {datetime.now().strftime('%d/%m/%Y')}")
 
         y_header_top = page_height - margem_top - titulo_h
         y_header_bottom = y_header_top - header_h
