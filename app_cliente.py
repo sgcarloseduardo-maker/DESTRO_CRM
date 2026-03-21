@@ -21,7 +21,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# CSS para layout do carrinho super compacto e centralizado (linhas reduzidas em 1/3)
+# CSS para layout do carrinho ULTRA compacto e centralizado (linhas reduzidas pela metade)
 st.markdown("""
 <style>
     div[data-testid="stImage"] img {
@@ -31,59 +31,64 @@ st.markdown("""
         background-color: white;
     }
     
-    /* Remove padding interno das colunas do streamlit na parte do carrinho para colar os elementos */
+    /* Remove padding e margin internos das colunas na seção compacta */
     .compact-row div[data-testid="column"] {
         padding: 0px !important;
         margin: 0px !important;
+        min-height: auto !important;
     }
     
-    /* Configuração da miniatura com altura reduzida (de 25px para 16px) */
+    /* Configuração da miniatura com altura reduzida pela metade */
     .carrinho-img img {
         object-fit: contain !important;
-        height: 16px !important;
-        width: 16px !important;
+        height: 12px !important;
+        width: 12px !important;
+        margin: 0 auto !important;
     }
     
-    /* Centralização horizontal e vertical de todos os textos com altura ultra espremida */
+    /* Textos com altura ultra espremida e fonte menor */
     .carrinho-texto {
         display: flex;
-        justify-content: center; /* Centraliza horizontalmente */
-        align-items: center;     /* Centraliza verticalmente */
-        height: 16px;            /* Altura reduzida em 1/3 */
-        font-size: 11px;         /* Fonte um pouco menor para caber na nova altura */
+        justify-content: center;
+        align-items: center;
+        height: 12px;            /* Metade da altura anterior */
+        font-size: 10px;         /* Fonte reduzida para caber na linha */
         font-weight: bold;       
-        margin: 0;
-        padding: 0;
+        margin: 0 !important;
+        padding: 0 !important;
+        line-height: 1 !important;
     }
     
-    /* Centraliza o botão dentro da sua div com altura reduzida */
+    /* Div do botão reduzida */
     .carrinho-btn {
         display: flex;
         justify-content: center;
         align-items: center;
-        height: 16px;
+        height: 12px;
     }
     
-    /* Espreme o botão padrão do streamlit ainda mais */
+    /* Espreme o botão padrão do streamlit ao máximo */
     .carrinho-btn button {
-        min-height: 14px !important;
-        height: 14px !important;
+        min-height: 10px !important;
+        height: 10px !important;
         padding: 0px 4px !important;
         line-height: 1 !important;
         font-size: 8px !important;
         margin: 0 !important;
     }
 
-    /* Linha divisória ultra grudada */
+    /* Linha divisória super colada e mais fina */
     .linha-separadora {
-        margin: 1px 0px 1px 0px !important; 
+        margin: 0px !important; 
         border: 0; 
-        border-top: 2px solid #94a3b8;
+        border-top: 1px solid #cbd5e1;
     }
     
-    /* Remove espaço extra do markdown vazio */
-    p {
-        margin-bottom: 0 !important;
+    /* Remove todos os espaços extras gerados por marcações de texto vazias no Streamlit */
+    .compact-row p {
+        margin: 0 !important;
+        padding: 0 !important;
+        line-height: 1 !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -596,7 +601,7 @@ if len(st.session_state['carrinho']) > 0:
                 st.markdown("</div>", unsafe_allow_html=True)
             else:
                 st.markdown(
-                    "<div class='carrinho-texto' style='color: gray; font-size: 9px; font-weight: normal;'>Sem foto</div>", unsafe_allow_html=True)
+                    "<div class='carrinho-texto' style='color: gray; font-size: 8px; font-weight: normal;'>Sem foto</div>", unsafe_allow_html=True)
 
         with c2:
             st.markdown(
