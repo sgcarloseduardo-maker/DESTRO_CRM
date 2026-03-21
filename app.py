@@ -1314,6 +1314,80 @@ def atualizar_prazo():
 # ==========================================
 with st.sidebar:
     st.image("https://cdn-icons-png.flaticon.com/512/3144/3144456.png", width=60)
+    
+    # ==========================================
+    # 1. NOVO CAMPO: PEDIDO CLIENTE (UPLOAD PDF)
+    # ==========================================
+    st.markdown("<p class='subtitulo'>Pedido Cliente</p>", unsafe_allow_html=True)
+    pdf_pedido = st.file_uploader("Upload de Pedido (PDF)", type=["pdf"], key="pdf_pedido_upload")
+    
+    if pdf_pedido is not None:
+        if st.button("Processar Pedido", use_container_width=True, type="primary"):
+            try:
+                import pdfplumber
+                with pdfplumber.open(pdf_pedido) as pdf:
+                    texto_pdf = ""
+                    for page in pdf.pages:
+                        texto_pdf += page.extract_text() + "\n"
+                
+                codigos_encontrados = []
+                # Procura no texto do PDF por linhas que começam com o código (ex: 71718-3)
+                for line in texto_pdf.split('\n'):
+                    m = re.match(r'^\s*(\d{3,}(?:-\d+)?)', line)
+                    if m:
+                        codigos_encontrados.append(m.group(1))
+
+                if codigos_encontrados:
+                    faltantes_ped = []
+                    adicionados_ped = 0
+                    
+                    df_base_ped = df_raw.copy()
+                    prazo_atual = st.session_state.get('prazo_selector', 'Preço_7')
+                    if not prazo_atual:
+                        prazo_atual = 'Preço_7'
+                        
+                    for cod_raw in codigos_encontrados:
+                        # Extrai apenas os números antes do traço para buscar na base
+                        cod_limpo = re.sub(r"\D", "", str(cod_raw).split("-")[0])
+                        
+                        df_match = df_base_ped[df_base_ped['Código'].apply(
+                            lambda x: re.sub(r"\D", "", str(x).split("-")[0])) == cod_limpo]
+                        
+                        if df_match.empty:
+                            faltantes_ped.append(cod_raw)
+                        else:
+                            r = df_match.iloc[0]
+                            preco_base = r[prazo_atual] if pd.notna(r[prazo_atual]) else r['Preço_7']
+                            
+                            # Adiciona se já não estiver na lista
+                            if not any(d['Código'] == r['Código'] for d in st.session_state['produtos_selecionados']):
+                                st.session_state['produtos_selecionados'].append({
+                                    'Levar': True, 'Código': r['Código'], 'Status': 'Incluído via Pedido',
+                                    'Descrição': r['Descrição'], 'Preço Atual': float(preco_base),
+                                    'Comissão': 0.0, 'FLEX': 0.0, 'DESC': 0.0, 'Imposto': False,
+                                    'Preço Final': float(preco_base), 'ST_Flag': r.get('ST_Flag', '')
+                                })
+                                adicionados_ped += 1
+                                
+                    if faltantes_ped:
+                        st.warning(f"⚠️ {len(faltantes_ped)} código(s) do PDF não localizados na base.")
+                    if adicionados_ped > 0:
+                        st.success(f"✅ {adicionados_ped} produto(s) adicionados ao painel!")
+                        time.sleep(1.5)
+                        st.rerun()
+                else:
+                    st.warning("Nenhum código reconhecido no PDF.")
+                    
+            except ImportError:
+                st.error("Biblioteca não instalada. Feche o app e execute: pip install pdfplumber")
+            except Exception as e:
+                st.error(f"Erro ao ler PDF: {e}")
+                
+    st.divider()
+
+    # ==========================================
+    # LAYOUT DO ENCARTE (Existente)
+    # ==========================================
     st.markdown("<p class='subtitulo'>Layout do Encarte</p>",
                 unsafe_allow_html=True)
 
@@ -1335,6 +1409,19 @@ with st.sidebar:
     num_produtos = st.session_state['num_produtos_layout']
     st.divider()
 
+    # ==========================================
+    # 2. NOVA LINHA: DATA DA ÚLTIMA ATUALIZAÇÃO DA BASE
+    # ==========================================
+    base_dir_app = os.path.dirname(os.path.abspath(__file__))
+    caminho_planilha_app = os.path.join(base_dir_app, "Programa_Destro-04-03.xlsx")
+    if os.path.exists(caminho_planilha_app):
+        mtime = os.path.getmtime(caminho_planilha_app)
+        data_atualizacao = datetime.fromtimestamp(mtime).strftime("%d/%m/%Y às %H:%M")
+        st.markdown(f"<div style='text-align:center; font-size:12px; color:#64748b; margin-bottom:10px; padding:5px; background-color:#e2e8f0; border-radius:4px;'>📅 Base Excel atualizada em: <b>{data_atualizacao}</b></div>", unsafe_allow_html=True)
+
+    # ==========================================
+    # PRAZO DE PAGAMENTO (Existente)
+    # ==========================================
     st.markdown("<p class='subtitulo'>Prazo de Pagamento</p>",
                 unsafe_allow_html=True)
     opcoes_prazo = {"Preço_7": "7 Dias", "Preço_14": "14 Dias",
