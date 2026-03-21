@@ -21,7 +21,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# CSS para layout do carrinho super compacto e centralizado
+# CSS para layout do carrinho super compacto e centralizado (linhas reduzidas em 1/3)
 st.markdown("""
 <style>
     div[data-testid="stImage"] img {
@@ -37,51 +37,51 @@ st.markdown("""
         margin: 0px !important;
     }
     
-    /* Configuração da miniatura com altura mínima */
+    /* Configuração da miniatura com altura reduzida (de 25px para 16px) */
     .carrinho-img img {
         object-fit: contain !important;
-        height: 25px !important;
-        width: 25px !important;
+        height: 16px !important;
+        width: 16px !important;
     }
     
-    /* Centralização horizontal e vertical de todos os textos com altura espremida */
+    /* Centralização horizontal e vertical de todos os textos com altura ultra espremida */
     .carrinho-texto {
         display: flex;
         justify-content: center; /* Centraliza horizontalmente */
         align-items: center;     /* Centraliza verticalmente */
-        height: 25px;            /* Altura mínima acompanhando a foto */
-        font-size: 13px;
-        font-weight: bold;       /* Coloca em negrito conforme solicitado */
+        height: 16px;            /* Altura reduzida em 1/3 */
+        font-size: 11px;         /* Fonte um pouco menor para caber na nova altura */
+        font-weight: bold;       
         margin: 0;
         padding: 0;
     }
     
-    /* Centraliza o botão dentro da sua div */
+    /* Centraliza o botão dentro da sua div com altura reduzida */
     .carrinho-btn {
         display: flex;
         justify-content: center;
         align-items: center;
-        height: 25px;
+        height: 16px;
     }
     
-    /* Espreme o botão padrão do streamlit no carrinho */
+    /* Espreme o botão padrão do streamlit ainda mais */
     .carrinho-btn button {
-        min-height: 20px !important;
-        height: 20px !important;
-        padding: 0px 8px !important;
+        min-height: 14px !important;
+        height: 14px !important;
+        padding: 0px 4px !important;
         line-height: 1 !important;
-        font-size: 10px !important;
+        font-size: 8px !important;
         margin: 0 !important;
     }
 
-    /* Linha divisória bem grudada */
+    /* Linha divisória ultra grudada */
     .linha-separadora {
-        margin: 2px 0px 2px 0px !important; 
+        margin: 1px 0px 1px 0px !important; 
         border: 0; 
         border-top: 2px solid #94a3b8;
     }
     
-    /* Remove espaço extra do markdown vazio (botões) */
+    /* Remove espaço extra do markdown vazio */
     p {
         margin-bottom: 0 !important;
     }
@@ -332,7 +332,6 @@ def gerar_pdf_pedido(produtos_selecionados):
     title = Paragraph("<b>Meu Pedido de Produtos</b>", styles['Title'])
     elements.append(title)
 
-    # DATA APENAS (Sem horário)
     data_atual = datetime.now().strftime("%d/%m/%Y")
     elements.append(
         Paragraph(f"<b>Data do Pedido:</b> {data_atual}", styles['Normal']))
@@ -564,7 +563,7 @@ else:
     st.warning("Nenhum produto encontrado com os filtros selecionados.")
 
 # ==========================================
-# LISTA DE PRODUTOS SELECIONADOS - VISUAL LIMPO E COMPACTO
+# LISTA DE PRODUTOS SELECIONADOS - VISUAL ULTRA COMPACTO
 # ==========================================
 st.divider()
 st.header("📋 Produtos no seu Carrinho")
@@ -582,7 +581,7 @@ if len(st.session_state['carrinho']) > 0:
         <hr class='linha-separadora'>
     """, unsafe_allow_html=True)
 
-    # Criação de um container com uma classe especial para remover o padding das colunas nativas
+    # Container sem padding
     st.markdown('<div class="compact-row">', unsafe_allow_html=True)
 
     for cod, prod in list(st.session_state['carrinho'].items()):
@@ -597,7 +596,7 @@ if len(st.session_state['carrinho']) > 0:
                 st.markdown("</div>", unsafe_allow_html=True)
             else:
                 st.markdown(
-                    "<div class='carrinho-texto' style='color: gray; font-size: 11px; font-weight: normal;'>Sem foto</div>", unsafe_allow_html=True)
+                    "<div class='carrinho-texto' style='color: gray; font-size: 9px; font-weight: normal;'>Sem foto</div>", unsafe_allow_html=True)
 
         with c2:
             st.markdown(
@@ -622,7 +621,6 @@ if len(st.session_state['carrinho']) > 0:
     # BOTOES NO FINAL (Baixar PDF e Limpar Carrinho)
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # Organiza os botões lado a lado centralizados
     c_espaco1, btn_limpar, btn_baixar, c_espaco2 = st.columns([2, 2, 2, 2])
 
     with btn_limpar:
