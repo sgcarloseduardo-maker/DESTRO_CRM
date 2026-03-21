@@ -22,55 +22,94 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# CSS para a vitrine e tabela compacta do carrinho
+# CSS para padronização RIGOROSA da vitrine (grade) e do carrinho (tabela)
 st.markdown("""
 <style>
-    div[data-testid="stImage"] img {
-        object-fit: contain;
-        height: 180px;
-        width: 100%;
+    /* ========================================== */
+    /* VITRINE (Grade de Produtos)                */
+    /* ========================================== */
+    /* Força todas as imagens a terem o exato mesmo tamanho e formato quadrado na grade */
+    div[data-testid="stImage"] {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 180px !important;
+        width: 100% !important;
         background-color: white;
+        overflow: hidden;
     }
     
-    /* Configurações da Tabela HTML do Carrinho */
+    div[data-testid="stImage"] img {
+        object-fit: contain !important;
+        max-height: 160px !important;
+        max-width: 160px !important;
+        margin: auto;
+    }
+    
+    /* Padroniza a altura do container de cada produto para não ficarem desalinhados */
+    div[data-testid="stVerticalBlock"] div.st-emotion-cache-1wivap2 {
+        min-height: 380px !important;
+        height: 380px !important;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+
+    /* ========================================== */
+    /* CARRINHO (Tabela HTML)                     */
+    /* ========================================== */
     .tabela-carrinho {
         width: 100%;
         border-collapse: collapse;
-        font-size: 11px;
-        font-weight: bold;
+        font-family: Arial, sans-serif;
     }
     
     .tabela-carrinho th {
         text-align: center;
-        padding: 4px;
+        padding: 6px;
         border-bottom: 2px solid #94a3b8;
-        font-size: 13px;
+        font-size: 14px;
+        color: #334155;
     }
     
+    /* Linha super compacta: 24px de altura total para caber mais itens, com fonte legível de 12px */
     .tabela-carrinho td {
         text-align: center;
-        padding: 0px !important; /* Zero padding para colar a linha */
+        padding: 2px 4px !important;
         margin: 0px !important;
-        border-bottom: 1px solid #cbd5e1;
-        height: 20px; /* Altura final real da linha travada */
+        border-bottom: 1px solid #e2e8f0;
+        height: 24px !important;
+        font-size: 12px !important; /* Fonte aumentada para melhor leitura */
+        font-weight: bold;
+        color: #1e293b;
         vertical-align: middle;
+        white-space: nowrap;      /* Impede que o texto quebre em duas linhas */
+        overflow: hidden;
+        text-overflow: ellipsis;  /* Coloca "..." se a descrição for muito grande */
+        max-width: 300px;         /* Limite pro ellipsis funcionar na descrição */
     }
     
+    /* Imagem padronizada para casar com a altura da linha: 20px */
     .tabela-carrinho img {
-        height: 18px; /* Imagem acompanhando o tamanho da linha */
-        width: 18px;
-        object-fit: contain;
+        height: 20px !important;
+        width: 20px !important;
+        object-fit: contain !important;
         vertical-align: middle;
+        display: block;
+        margin: 0 auto;
     }
     
-    /* Remover padding extra dos botões de exclusão nas colunas de apoio */
+    /* Botão da lixeira espremido e colado */
     div[data-testid="column"] button {
         padding: 0 !important;
-        margin: 0 !important;
-        height: 20px !important;
-        min-height: 20px !important;
-        font-size: 10px !important;
+        margin: 0px 0px 1px 0px !important; /* Margem minúscula pra alinhar com a td de 24px */
+        height: 23px !important;
+        min-height: 23px !important;
+        font-size: 12px !important;
         line-height: 1 !important;
+        display: flex;
+        justify-content: center;
+        align-items: center;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -479,7 +518,7 @@ if not df_filtrado.empty:
 
     st.divider()
 
-    # Exibição do Catálogo
+    # Exibição do Catálogo (Grade)
     itens_por_pagina = 20
     total_paginas = max(1, len(df_filtrado) // itens_por_pagina +
                         (1 if len(df_filtrado) % itens_por_pagina > 0 else 0))
@@ -520,7 +559,7 @@ if not df_filtrado.empty:
                         if img_path and os.path.exists(img_path):
                             st.image(img_path, use_container_width=True)
                         else:
-                            st.info("📷 Sem Imagem")
+                            st.markdown("<div style='height: 180px; display: flex; align-items: center; justify-content: center; background-color: #f8fafc; color: #64748b; margin-bottom: 1rem; border-radius: 4px;'>Sem Imagem</div>", unsafe_allow_html=True)
 
                         st.markdown(f"**Cód: {cod}**")
                         desc_curta = desc if len(
@@ -557,24 +596,22 @@ else:
     st.warning("Nenhum produto encontrado com os filtros selecionados.")
 
 # ==========================================
-# LISTA DE PRODUTOS SELECIONADOS - VISUAL HTML ULTRA COMPACTO
+# LISTA DE PRODUTOS SELECIONADOS - VISUAL HTML ULTRA COMPACTO E UNIFORME
 # ==========================================
 st.divider()
 st.header("📋 Produtos no seu Carrinho")
 
 if len(st.session_state['carrinho']) > 0:
 
-    # Vamos usar colunas do st apenas para separar a tabela dos botões de exclusão que precisam de ação Python
     c_tab, c_btn = st.columns([9, 1])
 
     with c_tab:
-        # Iniciamos a string HTML da tabela
         tabela_html = """
         <table class='tabela-carrinho'>
             <tr>
-                <th style='width: 15%;'>Foto</th>
+                <th style='width: 10%;'>Foto</th>
                 <th style='width: 25%;'>Código</th>
-                <th style='width: 60%;'>Descrição</th>
+                <th style='width: 65%;'>Descrição</th>
             </tr>
         """
 
@@ -582,7 +619,8 @@ if len(st.session_state['carrinho']) > 0:
             img_path = prod.get('ImgPath')
             base64_img = imagem_para_base64(img_path)
 
-            img_tag = f"<img src='data:image/jpeg;base64,{base64_img}'>" if base64_img else "<span style='color: gray; font-size: 8px;'>Sem foto</span>"
+            # Imagem perfeitamente travada a 20x20px
+            img_tag = f"<img src='data:image/jpeg;base64,{base64_img}'>" if base64_img else "<span style='color: gray; font-size: 8px;'>S/F</span>"
 
             linha = f"""
             <tr>
@@ -594,14 +632,11 @@ if len(st.session_state['carrinho']) > 0:
             tabela_html += linha
 
         tabela_html += "</table>"
-
-        # Renderiza a tabela HTML inteira espremida
         st.markdown(tabela_html, unsafe_allow_html=True)
 
     with c_btn:
-        # Colocamos os botões de remover alinhados com a altura de cada linha da tabela
-        # Usamos markdown no topo para compensar a altura do cabeçalho da tabela (Header)
-        st.markdown("<div style='height: 30px;'></div>",
+        # Altura exata para bater com a tabela
+        st.markdown("<div style='height: 38px;'></div>",
                     unsafe_allow_html=True)
 
         for cod in list(st.session_state['carrinho'].keys()):
@@ -609,9 +644,8 @@ if len(st.session_state['carrinho']) > 0:
                 del st.session_state['carrinho'][cod]
                 st.rerun()
 
-    # BOTOES NO FINAL (Baixar PDF e Limpar Carrinho)
+    # BOTOES NO FINAL
     st.markdown("<br>", unsafe_allow_html=True)
-
     c_espaco1, btn_limpar, btn_baixar, c_espaco2 = st.columns([2, 2, 2, 2])
 
     with btn_limpar:
