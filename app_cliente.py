@@ -606,14 +606,12 @@ if len(st.session_state['carrinho']) > 0:
     c_tab, c_btn = st.columns([9, 1])
 
     with c_tab:
-        tabela_html = """
-        <table class='tabela-carrinho'>
-            <tr>
-                <th style='width: 10%;'>Foto</th>
-                <th style='width: 25%;'>Código</th>
-                <th style='width: 65%;'>Descrição</th>
-            </tr>
-        """
+        tabela_html = """<table class='tabela-carrinho'>
+<tr>
+<th style='width: 10%;'>Foto</th>
+<th style='width: 25%;'>Código</th>
+<th style='width: 65%;'>Descrição</th>
+</tr>"""
 
         for cod, prod in list(st.session_state['carrinho'].items()):
             img_path = prod.get('ImgPath')
@@ -622,17 +620,15 @@ if len(st.session_state['carrinho']) > 0:
             # Imagem perfeitamente travada a 20x20px
             img_tag = f"<img src='data:image/jpeg;base64,{base64_img}'>" if base64_img else "<span style='color: gray; font-size: 8px;'>S/F</span>"
 
-            linha = f"""
-            <tr>
-                <td>{img_tag}</td>
-                <td>{cod}</td>
-                <td>{prod['Descrição']}</td>
-            </tr>
-            """
+            linha = f"""<tr>
+<td>{img_tag}</td>
+<td>{cod}</td>
+<td>{prod['Descrição']}</td>
+</tr>"""
             tabela_html += linha
 
         tabela_html += "</table>"
-        st.markdown(tabela_html, unsafe_allow_html=True)
+        st.html(tabela_html)
 
     with c_btn:
         # Altura exata para bater com a tabela
