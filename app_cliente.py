@@ -22,106 +22,487 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# CSS para padronização RIGOROSA da vitrine (grade) e do carrinho (tabela)
+# CSS premium para refinamento visual do CRM cliente
 st.markdown("""
 <style>
-    /* ========================================== */
-    /* VITRINE (Grade de Produtos)                */
-    /* ========================================== */
-    /* Força todas as imagens a terem o exato mesmo tamanho e formato quadrado na grade */
+    :root {
+        --destro-red: #d72638;
+        --destro-red-dark: #b81f30;
+        --destro-red-soft: #fdecee;
+        --destro-navy: #0f172a;
+        --destro-slate: #334155;
+        --destro-muted: #64748b;
+        --destro-border: #e2e8f0;
+        --destro-panel: #ffffff;
+        --destro-bg: #f6f8fc;
+        --destro-blue-soft: #eef4ff;
+        --destro-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+        --destro-radius: 18px;
+    }
+
+    .stApp {
+        background:
+            radial-gradient(circle at top right, rgba(215, 38, 56, 0.06), transparent 22%),
+            linear-gradient(180deg, #fbfcff 0%, #f6f8fc 100%);
+    }
+
+    .main .block-container {
+        padding-top: 1.4rem;
+        padding-bottom: 2rem;
+        max-width: 1380px;
+    }
+
+    section[data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #0f172a 0%, #172033 100%);
+        border-right: 1px solid rgba(255,255,255,0.08);
+    }
+
+    section[data-testid="stSidebar"] .block-container {
+        padding-top: 1.2rem;
+    }
+
+    section[data-testid="stSidebar"] * {
+        color: #e5edf8;
+    }
+
+    section[data-testid="stSidebar"] .stSelectbox label,
+    section[data-testid="stSidebar"] .stMarkdown,
+    section[data-testid="stSidebar"] .stCaption,
+    section[data-testid="stSidebar"] .stText,
+    section[data-testid="stSidebar"] p,
+    section[data-testid="stSidebar"] span {
+        color: #d9e3f0 !important;
+    }
+
+    section[data-testid="stSidebar"] [data-baseweb="select"] > div,
+    section[data-testid="stSidebar"] .stSelectbox > div > div,
+    section[data-testid="stSidebar"] .stMultiSelect > div > div {
+        background: rgba(255,255,255,0.08) !important;
+        border: 1px solid rgba(255,255,255,0.12) !important;
+        border-radius: 14px !important;
+        color: white !important;
+    }
+
+    section[data-testid="stSidebar"] hr {
+        border-color: rgba(255,255,255,0.09) !important;
+    }
+
+    .destro-topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 18px;
+        padding: 14px 20px;
+        margin-bottom: 18px;
+        border: 1px solid rgba(15, 23, 42, 0.07);
+        background: rgba(255,255,255,0.85);
+        backdrop-filter: blur(10px);
+        border-radius: 18px;
+        box-shadow: var(--destro-shadow);
+    }
+
+    .destro-topbar-left {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+    }
+
+    .destro-topbar-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: var(--destro-red-soft);
+        color: var(--destro-red-dark);
+        border: 1px solid #f8c9cf;
+        border-radius: 999px;
+        padding: 7px 12px;
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+    }
+
+    .destro-hero {
+        position: relative;
+        overflow: hidden;
+        padding: 28px 30px;
+        margin-bottom: 22px;
+        border-radius: 26px;
+        background: linear-gradient(135deg, #0f172a 0%, #172554 48%, #d72638 140%);
+        color: white;
+        box-shadow: 0 22px 45px rgba(15, 23, 42, 0.18);
+        border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .destro-hero::before,
+    .destro-hero::after {
+        content: "";
+        position: absolute;
+        border-radius: 999px;
+        background: rgba(255,255,255,0.08);
+        filter: blur(1px);
+    }
+
+    .destro-hero::before {
+        width: 220px;
+        height: 220px;
+        top: -70px;
+        right: -40px;
+    }
+
+    .destro-hero::after {
+        width: 160px;
+        height: 160px;
+        bottom: -60px;
+        right: 140px;
+    }
+
+    .destro-hero-grid {
+        position: relative;
+        z-index: 2;
+        display: grid;
+        grid-template-columns: minmax(0, 1.4fr) minmax(260px, 0.7fr);
+        gap: 24px;
+        align-items: center;
+    }
+
+    .destro-kicker {
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.14em;
+        font-weight: 800;
+        opacity: 0.86;
+        margin-bottom: 12px;
+    }
+
+    .destro-title {
+        font-size: 2.3rem;
+        line-height: 1.05;
+        font-weight: 900;
+        margin: 0 0 12px 0;
+        color: white !important;
+    }
+
+    .destro-subtitle {
+        font-size: 1rem;
+        line-height: 1.6;
+        color: rgba(255,255,255,0.86);
+        max-width: 760px;
+        margin: 0;
+    }
+
+    .destro-info-card {
+        position: relative;
+        z-index: 2;
+        background: rgba(255,255,255,0.12);
+        border: 1px solid rgba(255,255,255,0.16);
+        border-radius: 20px;
+        padding: 18px 18px 16px 18px;
+        backdrop-filter: blur(10px);
+    }
+
+    .destro-info-card-title {
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        font-weight: 800;
+        color: rgba(255,255,255,0.78);
+        margin-bottom: 10px;
+    }
+
+    .destro-info-card strong {
+        display: block;
+        font-size: 1.35rem;
+        margin-bottom: 6px;
+    }
+
+    .destro-mini-note {
+        font-size: 0.92rem;
+        color: rgba(255,255,255,0.8);
+        line-height: 1.5;
+    }
+
+    .destro-section-title {
+        font-size: 1.18rem;
+        font-weight: 800;
+        color: var(--destro-navy);
+        margin: 0.2rem 0 0.8rem 0;
+    }
+
+    .destro-soft-card {
+        background: rgba(255,255,255,0.92);
+        border: 1px solid rgba(15, 23, 42, 0.06);
+        border-radius: 18px;
+        box-shadow: var(--destro-shadow);
+        padding: 12px 14px;
+    }
+
+    .destro-footer-note {
+        text-align: right;
+        color: #7c8ba1;
+        font-size: 12px;
+        margin-top: -8px;
+        margin-bottom: 16px;
+        font-weight: 600;
+    }
+
+    h1, h2, h3 {
+        color: var(--destro-navy);
+        letter-spacing: -0.02em;
+    }
+
+    h1 {
+        font-weight: 900 !important;
+    }
+
+    div[data-testid="stMetric"] {
+        background: linear-gradient(180deg, #ffffff 0%, #f9fbff 100%);
+        border: 1px solid rgba(15, 23, 42, 0.07);
+        border-radius: 18px;
+        padding: 12px 14px;
+        box-shadow: var(--destro-shadow);
+    }
+
+    div[data-testid="stButton"] > button {
+        border-radius: 14px !important;
+        border: 1px solid #d9e2ef !important;
+        font-weight: 800 !important;
+        letter-spacing: 0.01em;
+        min-height: 2.9rem !important;
+        box-shadow: 0 8px 20px rgba(15, 23, 42, 0.05);
+        transition: all 0.18s ease;
+    }
+
+    div[data-testid="stButton"] > button:hover {
+        transform: translateY(-1px);
+        border-color: #c2cfdf !important;
+    }
+
+    div[data-testid="stButton"] > button[kind="primary"] {
+        background: linear-gradient(135deg, var(--destro-red) 0%, #ef4444 100%) !important;
+        color: white !important;
+        border: none !important;
+        box-shadow: 0 14px 28px rgba(215, 38, 56, 0.24) !important;
+    }
+
+    div[data-testid="stDownloadButton"] > button {
+        border-radius: 14px !important;
+        min-height: 2.95rem !important;
+        font-weight: 800 !important;
+        border: none !important;
+        color: white !important;
+        background: linear-gradient(135deg, #0f766e 0%, #14b8a6 100%) !important;
+        box-shadow: 0 14px 28px rgba(20, 184, 166, 0.24) !important;
+    }
+
+    [data-baseweb="select"] > div,
+    .stTextInput > div > div,
+    .stNumberInput > div > div,
+    .stDateInput > div > div,
+    .stTextArea textarea {
+        border-radius: 14px !important;
+        border: 1px solid #d9e2ef !important;
+        background: rgba(255,255,255,0.96) !important;
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.8);
+    }
+
+    div[data-testid="stSelectbox"] label,
+    div[data-testid="stMultiSelect"] label {
+        font-weight: 700 !important;
+        color: var(--destro-slate) !important;
+    }
+
+    div[data-testid="stVerticalBlock"] div.st-emotion-cache-1wivap2 {
+        min-height: 410px !important;
+        height: 410px !important;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+        border: 1px solid rgba(15, 23, 42, 0.06) !important;
+        border-radius: 22px !important;
+        box-shadow: var(--destro-shadow);
+        padding: 8px 8px 10px 8px;
+    }
+
     div[data-testid="stImage"] {
         display: flex;
         justify-content: center;
         align-items: center;
         height: 180px !important;
         width: 100% !important;
-        background-color: white;
+        background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
         overflow: hidden;
+        border-radius: 18px;
+        border: 1px solid #edf2f7;
     }
-    
+
     div[data-testid="stImage"] img {
         object-fit: contain !important;
         max-height: 160px !important;
         max-width: 160px !important;
         margin: auto;
-    }
-    
-    /* Padroniza a altura do container de cada produto para não ficarem desalinhados */
-    div[data-testid="stVerticalBlock"] div.st-emotion-cache-1wivap2 {
-        min-height: 380px !important;
-        height: 380px !important;
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
+        filter: drop-shadow(0 6px 10px rgba(15, 23, 42, 0.08));
     }
 
-    /* ========================================== */
-    /* CARRINHO (Tabela HTML)                     */
-    /* ========================================== */
+    .stCaption {
+        color: var(--destro-muted) !important;
+        font-weight: 600;
+    }
+
     .tabela-carrinho {
         width: 100%;
-        border-collapse: collapse;
+        border-collapse: separate;
+        border-spacing: 0;
+        overflow: hidden;
+        border: 1px solid #e2e8f0;
+        border-radius: 18px;
+        box-shadow: var(--destro-shadow);
+        background: white;
         font-family: Arial, sans-serif;
     }
-    
+
     .tabela-carrinho th {
         text-align: center;
-        padding: 6px;
-        border-bottom: 2px solid #94a3b8;
-        font-size: 14px;
-        color: #334155;
+        padding: 10px 8px;
+        background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+        border-bottom: 1px solid #1e293b;
+        font-size: 13px;
+        font-weight: 800;
+        color: #f8fafc;
     }
-    
-    /* Linha super compacta: 24px de altura total para caber mais itens, com fonte legível de 12px */
+
     .tabela-carrinho td {
         text-align: center;
-        padding: 2px 4px !important;
+        padding: 6px 8px !important;
         margin: 0px !important;
         border-bottom: 1px solid #e2e8f0;
-        height: 24px !important;
-        font-size: 12px !important; /* Fonte aumentada para melhor leitura */
-        font-weight: bold;
+        height: 36px !important;
+        font-size: 12px !important;
+        font-weight: 700;
         color: #1e293b;
         vertical-align: middle;
-        white-space: nowrap;      /* Impede que o texto quebre em duas linhas */
+        white-space: nowrap;
         overflow: hidden;
-        text-overflow: ellipsis;  /* Coloca "..." se a descrição for muito grande */
-        max-width: 300px;         /* Limite pro ellipsis funcionar na descrição */
+        text-overflow: ellipsis;
+        max-width: 320px;
+        background: white;
     }
-    
-    /* Imagem padronizada para casar com a altura da linha: 20px */
+
+    .tabela-carrinho tr:nth-child(even) td {
+        background: #fbfdff;
+    }
+
     .tabela-carrinho img {
-        height: 20px !important;
-        width: 20px !important;
+        height: 24px !important;
+        width: 24px !important;
         object-fit: contain !important;
         vertical-align: middle;
         display: block;
         margin: 0 auto;
     }
-    
-    /* Botão da lixeira espremido e colado */
+
     div[data-testid="column"] button {
         padding: 0 !important;
-        margin: 0px 0px 1px 0px !important; /* Margem minúscula pra alinhar com a td de 24px */
-        height: 23px !important;
-        min-height: 23px !important;
-        font-size: 12px !important;
+        margin: 0px 0px 4px 0px !important;
+        min-height: 36px !important;
+        height: 36px !important;
+        font-size: 13px !important;
         line-height: 1 !important;
         display: flex;
         justify-content: center;
         align-items: center;
     }
+
+    div[data-testid="stHorizontalBlock"] {
+        align-items: stretch;
+    }
+
+    [data-testid="stMarkdownContainer"] hr {
+        margin-top: 1rem;
+        margin-bottom: 1rem;
+        border-color: #e9eef5;
+    }
+
+    @media (max-width: 900px) {
+        .destro-hero-grid {
+            grid-template-columns: 1fr;
+        }
+        .destro-title {
+            font-size: 1.8rem;
+        }
+        .destro-topbar {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+    }
 </style>
 """, unsafe_allow_html=True)
 
-# COPYRIGHT NO TOPO
-st.markdown("<div style='text-align: right; color: gray; font-size: 12px; margin-top: -40px; margin-bottom: 20px;'>Sistema elaborado por EDG ENGENHARIA REPRESENTAÇÕES LTDA</div>", unsafe_allow_html=True)
+# ==========================================
+# TOPO INSTITUCIONAL E LOGO
+# ==========================================
+def obter_logo_destro():
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    candidatos = [
+        os.path.join(base_dir, "LOGO.png"),
+        os.path.join(base_dir, "images.jpg"),
+    ]
+    for caminho in candidatos:
+        if os.path.exists(caminho):
+            return caminho
+    return None
+
+
+def renderizar_topo_destro():
+    logo_path = obter_logo_destro()
+
+    st.markdown("""
+    <div class='destro-topbar'>
+        <div class='destro-topbar-left'>
+            <div class='destro-topbar-badge'>CRM Cliente • Destro</div>
+        </div>
+        <div class='destro-footer-note'>Sistema elaborado por EDG ENGENHARIA REPRESENTAÇÕES LTDA</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    hero_col1, hero_col2 = st.columns([1.6, 1.0], vertical_alignment="center")
+
+    with hero_col1:
+        st.markdown("""
+        <div class='destro-hero'>
+            <div class='destro-hero-grid'>
+                <div>
+                    <div class='destro-kicker'>Plataforma Comercial</div>
+                    <h1 class='destro-title'>Catálogo de Pedidos DESTRO</h1>
+                    <p class='destro-subtitle'>Selecione produtos com agilidade, monte o carrinho do cliente e gere o PDF final com uma experiência visual mais profissional, limpa e moderna.</p>
+                </div>
+                <div class='destro-info-card'>
+                    <div class='destro-info-card-title'>Ambiente comercial</div>
+                    <strong>CRM de atendimento e pedido</strong>
+                    <div class='destro-mini-note'>Visual institucional, navegação clara e foco total na conversão do pedido sem alterar a lógica do sistema.</div>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with hero_col2:
+        if logo_path:
+            st.image(logo_path, use_container_width=True)
+        else:
+            st.markdown("""
+            <div class='destro-soft-card' style='min-height: 210px; display:flex; align-items:center; justify-content:center; text-align:center;'>
+                <div>
+                    <div style='font-size:12px; font-weight:800; color:#d72638; text-transform:uppercase; letter-spacing:.08em; margin-bottom:8px;'>Marca</div>
+                    <div style='font-size:2rem; font-weight:900; color:#0f172a; letter-spacing:-.03em;'>DESTRO</div>
+                    <div style='font-size:.96rem; color:#64748b; margin-top:8px;'>Adicione LOGO.png ou images.jpg na pasta do app para exibição automática.</div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
 
 # ==========================================
 # FUNÇÕES DE IMAGEM E DIRETÓRIOS
 # ==========================================
-
-
 def normalizar_codigo_imagem(codigo: str) -> str:
     if not codigo:
         return ""
@@ -156,8 +537,6 @@ def imagem_para_base64(img_path):
 # ==========================================
 # CARREGAMENTO DOS DADOS E SINÔNIMOS
 # ==========================================
-
-
 def limpar_industria(val):
     val_str = str(val)
     match = re.search(r'\"(.*?)\"', val_str)
@@ -329,8 +708,6 @@ def pagina_anterior():
 # ==========================================
 # GERAÇÃO DO PDF
 # ==========================================
-
-
 def remover_fundo_branco(img: Image.Image) -> Image.Image:
     img = img.convert("RGBA")
     datas = img.getdata()
@@ -397,7 +774,7 @@ def gerar_pdf_pedido(produtos_selecionados):
 
                 img_pdf = RLImage(temp_buffer, width=45,
                                   height=45, kind='proportional')
-            except Exception as e:
+            except Exception:
                 img_pdf = "Sem Foto"
         else:
             img_pdf = "Sem Foto"
@@ -433,7 +810,11 @@ def gerar_pdf_pedido(produtos_selecionados):
 # INTERFACE DO STREAMLIT
 # ==========================================
 with st.sidebar:
-    st.header("🛒 Resumo")
+    logo_sidebar = obter_logo_destro()
+    if logo_sidebar:
+        st.image(logo_sidebar, use_container_width=True)
+
+    st.markdown("<div class='destro-section-title'>🛒 Resumo do Pedido</div>", unsafe_allow_html=True)
 
     carrinho_lista = list(st.session_state['carrinho'].values())
     st.write(f"**Itens selecionados:** {len(carrinho_lista)}")
@@ -455,7 +836,7 @@ with st.sidebar:
             )
 
     st.divider()
-    st.header("🔍 Filtros de Busca")
+    st.markdown("<div class='destro-section-title'>🔍 Filtros de Busca</div>", unsafe_allow_html=True)
 
     df_filtrado = df_raw.copy()
 
@@ -483,12 +864,14 @@ with st.sidebar:
 
 img_idx_global = obter_indice_imagens()
 
-st.title("Catálogo de Produtos")
+renderizar_topo_destro()
+
+st.markdown("<div class='destro-section-title'>Catálogo de Produtos</div>", unsafe_allow_html=True)
 
 # ==========================================
 # CAMPO DE BUSCA MANUAL
 # ==========================================
-st.markdown("<h3>Selecionar Produtos Manualmente</h3>", unsafe_allow_html=True)
+st.markdown("<div class='destro-section-title'>Selecionar Produtos Manualmente</div>", unsafe_allow_html=True)
 
 if not df_filtrado.empty:
     df_filtrado['Opcao_Busca'] = df_filtrado.apply(
@@ -559,11 +942,13 @@ if not df_filtrado.empty:
                         if img_path and os.path.exists(img_path):
                             st.image(img_path, use_container_width=True)
                         else:
-                            st.markdown("<div style='height: 180px; display: flex; align-items: center; justify-content: center; background-color: #f8fafc; color: #64748b; margin-bottom: 1rem; border-radius: 4px;'>Sem Imagem</div>", unsafe_allow_html=True)
+                            st.markdown(
+                                "<div style='height: 180px; display: flex; align-items: center; justify-content: center; background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%); color: #64748b; margin-bottom: 1rem; border-radius: 18px; border: 1px solid #edf2f7;'>Sem Imagem</div>",
+                                unsafe_allow_html=True
+                            )
 
                         st.markdown(f"**Cód: {cod}**")
-                        desc_curta = desc if len(
-                            desc) <= 45 else desc[:42] + "..."
+                        desc_curta = desc if len(desc) <= 45 else desc[:42] + "..."
                         st.caption(desc_curta)
 
                         no_carrinho = cod in st.session_state['carrinho']
@@ -596,10 +981,10 @@ else:
     st.warning("Nenhum produto encontrado com os filtros selecionados.")
 
 # ==========================================
-# LISTA DE PRODUTOS SELECIONADOS - VISUAL HTML ULTRA COMPACTO E UNIFORME
+# LISTA DE PRODUTOS SELECIONADOS
 # ==========================================
 st.divider()
-st.header("📋 Produtos no seu Carrinho")
+st.markdown("<div class='destro-section-title'>📋 Produtos no seu Carrinho</div>", unsafe_allow_html=True)
 
 if len(st.session_state['carrinho']) > 0:
 
@@ -617,7 +1002,6 @@ if len(st.session_state['carrinho']) > 0:
             img_path = prod.get('ImgPath')
             base64_img = imagem_para_base64(img_path)
 
-            # Imagem perfeitamente travada a 20x20px
             img_tag = f"<img src='data:image/jpeg;base64,{base64_img}'>" if base64_img else "<span style='color: gray; font-size: 8px;'>S/F</span>"
 
             linha = f"""<tr>
@@ -631,16 +1015,13 @@ if len(st.session_state['carrinho']) > 0:
         st.html(tabela_html)
 
     with c_btn:
-        # Altura exata para bater com a tabela
-        st.markdown("<div style='height: 38px;'></div>",
-                    unsafe_allow_html=True)
+        st.markdown("<div style='height: 42px;'></div>", unsafe_allow_html=True)
 
         for cod in list(st.session_state['carrinho'].keys()):
             if st.button("🗑️", key=f"lista_rem_{cod}", help="Remover", use_container_width=True):
                 del st.session_state['carrinho'][cod]
                 st.rerun()
 
-    # BOTOES NO FINAL
     st.markdown("<br>", unsafe_allow_html=True)
     c_espaco1, btn_limpar, btn_baixar, c_espaco2 = st.columns([2, 2, 2, 2])
 
