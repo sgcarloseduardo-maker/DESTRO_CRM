@@ -22,7 +22,6 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# CSS premium para refinamento visual do CRM cliente
 st.markdown("""
 <style>
     :root {
@@ -278,10 +277,6 @@ st.markdown("""
         box-shadow: var(--destro-shadow);
     }
 
-    div[data-testid="stButton"] {
-        margin-bottom: 0 !important;
-    }
-
     div[data-testid="stButton"] > button {
         border-radius: 14px !important;
         border: 1px solid #d9e2ef !important;
@@ -370,63 +365,78 @@ st.markdown("""
         font-weight: 600;
     }
 
-    .tabela-carrinho {
-        width: 100%;
-        border-collapse: separate;
-        border-spacing: 0;
+    .cart-header {
+        display: grid;
+        grid-template-columns: 110px 180px minmax(320px, 1fr) 96px;
         overflow: hidden;
-        border: 1px solid #e2e8f0;
-        border-radius: 18px;
+        border-radius: 18px 18px 0 0;
+        background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+        color: #f8fafc;
+        border: 1px solid #1e293b;
         box-shadow: var(--destro-shadow);
-        background: white;
-        font-family: Arial, sans-serif;
+        margin-bottom: 0;
     }
 
-    .tabela-carrinho th {
-        text-align: center;
-        padding: 10px 8px;
-        background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-        border-bottom: 1px solid #1e293b;
+    .cart-header div {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 48px;
         font-size: 13px;
         font-weight: 800;
-        color: #f8fafc;
+        text-align: center;
     }
 
-    .tabela-carrinho td {
-        text-align: center;
-        padding: 8px 10px !important;
-        margin: 0px !important;
-        border-bottom: 1px solid #e2e8f0;
-        height: 52px !important;
-        font-size: 12px !important;
+    .cart-col {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 72px;
+        padding: 10px 12px;
+        font-size: 12px;
         font-weight: 700;
         color: #1e293b;
-        vertical-align: middle;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        max-width: 320px;
+        text-align: center;
         background: white;
+        border-bottom: 1px solid #e2e8f0;
     }
 
-    .tabela-carrinho tr:nth-child(even) td {
-        background: #fbfdff;
+    .cart-col-desc {
+        justify-content: flex-start;
+        text-align: left;
+        padding-left: 18px;
+        padding-right: 18px;
     }
 
-    .tabela-carrinho img {
-        height: 34px !important;
-        width: 34px !important;
-        object-fit: contain !important;
-        vertical-align: middle;
+    .cart-thumb {
+        width: 38px;
+        height: 38px;
+        object-fit: contain;
         display: block;
         margin: 0 auto;
+    }
+
+    .cart-remove-shell {
+        min-height: 72px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .cart-remove-shell div[data-testid="stButton"] {
+        width: 100%;
+        margin: 0 !important;
+    }
+
+    .cart-remove-shell div[data-testid="stButton"] > button {
+        min-height: 54px !important;
+        height: 54px !important;
+        border-radius: 14px !important;
     }
 
     div[data-testid="column"] button {
         padding: 0 !important;
         margin: 0px !important;
-        min-height: 52px !important;
-        height: 52px !important;
         font-size: 13px !important;
         line-height: 1 !important;
         display: flex;
@@ -455,12 +465,15 @@ st.markdown("""
             flex-direction: column;
             align-items: flex-start;
         }
+        .cart-header {
+            grid-template-columns: 80px 110px minmax(180px, 1fr) 72px;
+        }
     }
 </style>
 """, unsafe_allow_html=True)
 
 # ==========================================
-# TOPO INSTITUCIONAL E LOGO
+# TOPO E LOGO
 # ==========================================
 def obter_logo_destro():
     base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -486,7 +499,7 @@ def renderizar_topo_destro():
     </div>
     """, unsafe_allow_html=True)
 
-    hero_col1, hero_col2 = st.columns([1.6, 1.0], vertical_alignment="center")
+    hero_col1, hero_col2 = st.columns([1.6, 1.0], vertical_alignment="top")
 
     with hero_col1:
         st.markdown("""
@@ -508,9 +521,9 @@ def renderizar_topo_destro():
 
     with hero_col2:
         if logo_path:
-            c1, c2, c3 = st.columns([1, 6, 1])
+            c1, c2, c3 = st.columns([0.8, 6.4, 0.8])
             with c2:
-                st.image(logo_path, use_container_width=True)
+                st.image(logo_path, width=360)
         else:
             st.markdown("""
             <div class='destro-soft-card' style='min-height: 210px; display:flex; align-items:center; justify-content:center; text-align:center;'>
@@ -522,8 +535,15 @@ def renderizar_topo_destro():
             </div>
             """, unsafe_allow_html=True)
 
+        st.markdown("""
+        <div class='destro-soft-card' style='margin-top: 14px; padding: 18px 18px 16px 18px;'>
+            <div style='font-size:12px; font-weight:800; color:#d72638; text-transform:uppercase; letter-spacing:.08em; margin-bottom:10px;'>Como utilizar</div>
+            <div style='font-size:.97rem; line-height:1.7; color:#334155;'>Selecione os produtos pelo botão de + ou digitando o nome ou código, utilize os filtros para encontrar a marca desejada, remova itens se necessário, gere o PDF do pedido para cotação, baixe o arquivo e envie ao seu representante para receber o atendimento com mais rapidez.</div>
+        </div>
+        """, unsafe_allow_html=True)
+
 # ==========================================
-# FUNÇÕES DE IMAGEM E DIRETÓRIOS
+# IMAGENS
 # ==========================================
 def normalizar_codigo_imagem(codigo: str) -> str:
     if not codigo:
@@ -539,6 +559,7 @@ def obter_indice_imagens():
     idx = {}
     if not os.path.exists(pasta_imagens):
         return idx
+
     for root, _, files in os.walk(pasta_imagens):
         for fn in files:
             ext = os.path.splitext(fn)[1].lower()
@@ -630,18 +651,29 @@ def carregar_dados():
         return pd.DataFrame()
 
     try:
-        df_ind = pd.read_excel(caminho_planilha, sheet_name="Industrias",
-                               skiprows=1, header=None, engine='openpyxl')
-        lista_industrias = sorted([i for i in df_ind[0].apply(
-            limpar_industria).dropna().unique() if i != ''])
+        df_ind = pd.read_excel(
+            caminho_planilha,
+            sheet_name="Industrias",
+            skiprows=1,
+            header=None,
+            engine="openpyxl"
+        )
+        _ = sorted([i for i in df_ind[0].apply(limpar_industria).dropna().unique() if i != ""])
     except Exception:
-        lista_industrias = []
+        pass
 
     try:
         df_marcas = pd.read_excel(
-            caminho_planilha, sheet_name="Marcas", skiprows=1, header=None, engine='openpyxl')
-        lista_marcas_reais = sorted([m.strip() for m in df_marcas[0].dropna().astype(
-            str) if m.strip().lower() != 'nan' and m.strip() != ''])
+            caminho_planilha,
+            sheet_name="Marcas",
+            skiprows=1,
+            header=None,
+            engine="openpyxl"
+        )
+        lista_marcas_reais = sorted([
+            m.strip() for m in df_marcas[0].dropna().astype(str)
+            if m.strip().lower() != "nan" and m.strip() != ""
+        ])
     except Exception:
         lista_marcas_reais = []
 
@@ -650,49 +682,57 @@ def carregar_dados():
     def achar_marca(desc):
         desc_up = str(desc).upper()
         for m in marcas_sorted:
-            if re.search(r'\b' + re.escape(m.upper()) + r'\b', desc_up):
+            if re.search(r"\b" + re.escape(m.upper()) + r"\b", desc_up):
                 return m
-        return 'Outra Marca'
+        return "Outra Marca"
 
     try:
         df_bateu = pd.read_excel(
-            caminho_planilha, sheet_name="BateuLevou", engine='openpyxl')
-        df_bateu['Desc_Norm'] = df_bateu['DESCRICAO'].astype(
-            str).apply(lambda x: re.sub(r'\s+', ' ', x.strip().upper()))
-        dict_bateu_ind = df_bateu.set_index(
-            'Desc_Norm')['INDUSTRIA'].to_dict() if 'INDUSTRIA' in df_bateu.columns else {}
-        dict_bateu_mar = df_bateu.set_index(
-            'Desc_Norm')['MARCA'].to_dict() if 'MARCA' in df_bateu.columns else {}
+            caminho_planilha,
+            sheet_name="BateuLevou",
+            engine="openpyxl"
+        )
+        df_bateu["Desc_Norm"] = df_bateu["DESCRICAO"].astype(str).apply(
+            lambda x: re.sub(r"\s+", " ", x.strip().upper())
+        )
+        dict_bateu_ind = df_bateu.set_index("Desc_Norm")["INDUSTRIA"].to_dict() if "INDUSTRIA" in df_bateu.columns else {}
+        dict_bateu_mar = df_bateu.set_index("Desc_Norm")["MARCA"].to_dict() if "MARCA" in df_bateu.columns else {}
     except Exception:
         dict_bateu_ind, dict_bateu_mar = {}, {}
 
     try:
-        df = pd.read_excel(caminho_planilha, sheet_name="Banco_Dados_Semanal",
-                           skiprows=5, header=None, engine='openpyxl')
+        df = pd.read_excel(
+            caminho_planilha,
+            sheet_name="Banco_Dados_Semanal",
+            skiprows=5,
+            header=None,
+            engine="openpyxl"
+        )
+
         cat_raw = df[1].astype(str)
-        mask_categoria = cat_raw.str.match(r'^\s*\d{1,3}\s*-\s*.+')
-        df['Categoria'] = cat_raw.where(
-            mask_categoria, other=None).ffill().apply(manter_categoria_completa)
-        df['Categoria'] = df['Categoria'].replace(
-            '', 'Sem Categoria').fillna('Sem Categoria')
+        mask_categoria = cat_raw.str.match(r"^\s*\d{1,3}\s*-\s*.+")
+        df["Categoria"] = cat_raw.where(mask_categoria, other=None).ffill().apply(manter_categoria_completa)
+        df["Categoria"] = df["Categoria"].replace("", "Sem Categoria").fillna("Sem Categoria")
 
-        df['Código'] = df[0].astype(str)
-        df['Descrição'] = df[2].astype(str).str.strip("* ")
+        df["Código"] = df[0].astype(str)
+        df["Descrição"] = df[2].astype(str).str.strip("* ")
 
-        df = df[(df['Descrição'].str.strip().str.lower() != 'nan')
-                & (df['Descrição'].str.strip() != '')]
+        df = df[
+            (df["Descrição"].str.strip().str.lower() != "nan") &
+            (df["Descrição"].str.strip() != "")
+        ]
 
-        df['Desc_Norm'] = df['Descrição'].apply(
-            lambda x: re.sub(r'\s+', ' ', str(x).strip().upper()))
-        df['Indústria'] = df['Desc_Norm'].map(
-            dict_bateu_ind).fillna('Sem Indústria')
-        df['Marca'] = df['Desc_Norm'].map(dict_bateu_mar)
-        mask_missing = df['Marca'].isna() | (df['Marca'] == '')
+        df["Desc_Norm"] = df["Descrição"].apply(
+            lambda x: re.sub(r"\s+", " ", str(x).strip().upper())
+        )
+        df["Indústria"] = df["Desc_Norm"].map(dict_bateu_ind).fillna("Sem Indústria")
+        df["Marca"] = df["Desc_Norm"].map(dict_bateu_mar)
+
+        mask_missing = df["Marca"].isna() | (df["Marca"] == "")
         if mask_missing.any():
-            df.loc[mask_missing, 'Marca'] = df.loc[mask_missing,
-                                                   'Desc_Norm'].apply(achar_marca)
+            df.loc[mask_missing, "Marca"] = df.loc[mask_missing, "Desc_Norm"].apply(achar_marca)
 
-        return df[['Código', 'Descrição', 'Indústria', 'Marca', 'Categoria']].drop_duplicates()
+        return df[["Código", "Descrição", "Indústria", "Marca", "Categoria"]].drop_duplicates()
 
     except Exception as e:
         st.error(f"Erro ao carregar Excel: {e}")
@@ -704,27 +744,27 @@ df_raw = carregar_dados()
 # ==========================================
 # VARIÁVEIS DE SESSÃO
 # ==========================================
-if 'carrinho' not in st.session_state:
-    st.session_state['carrinho'] = {}
+if "carrinho" not in st.session_state:
+    st.session_state["carrinho"] = {}
 
-if 'pagina_atual' not in st.session_state:
-    st.session_state['pagina_atual'] = 1
+if "pagina_atual" not in st.session_state:
+    st.session_state["pagina_atual"] = 1
 
-if 'busca_manual' not in st.session_state:
-    st.session_state['busca_manual'] = None
+if "busca_manual" not in st.session_state:
+    st.session_state["busca_manual"] = None
 
 
 def resetar_pagina():
-    st.session_state['pagina_atual'] = 1
+    st.session_state["pagina_atual"] = 1
 
 
 def proxima_pagina():
-    st.session_state['pagina_atual'] += 1
+    st.session_state["pagina_atual"] += 1
 
 
 def pagina_anterior():
-    if st.session_state['pagina_atual'] > 1:
-        st.session_state['pagina_atual'] -= 1
+    if st.session_state["pagina_atual"] > 1:
+        st.session_state["pagina_atual"] -= 1
 
 # ==========================================
 # GERAÇÃO DO PDF
@@ -732,22 +772,21 @@ def pagina_anterior():
 def remover_fundo_branco(img: Image.Image) -> Image.Image:
     img = img.convert("RGBA")
     datas = img.getdata()
-    newData = []
+    new_data = []
     for r, g, b, a in datas:
         if r > 240 and g > 240 and b > 240:
-            newData.append((255, 255, 255, 0))
+            new_data.append((255, 255, 255, 0))
         else:
-            newData.append((r, g, b, a))
-    img.putdata(newData)
+            new_data.append((r, g, b, a))
+    img.putdata(new_data)
     return img
 
 
 def rodape_pdf(canvas, doc):
     canvas.saveState()
-    canvas.setFont('Helvetica', 8)
+    canvas.setFont("Helvetica", 8)
     canvas.setFillColor(colors.gray)
-    canvas.drawString(
-        30, 20, "Sistema elaborado por EDG ENGENHARIA REPRESENTAÇÕES LTDA")
+    canvas.drawString(30, 20, "Sistema elaborado por EDG ENGENHARIA REPRESENTAÇÕES LTDA")
     canvas.restoreState()
 
 
@@ -755,24 +794,29 @@ def gerar_pdf_pedido(produtos_selecionados):
     img_idx = obter_indice_imagens()
     buffer = BytesIO()
 
-    doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=30,
-                            leftMargin=30, topMargin=30, bottomMargin=40)
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=letter,
+        rightMargin=30,
+        leftMargin=30,
+        topMargin=30,
+        bottomMargin=40
+    )
     styles = getSampleStyleSheet()
     elements = []
 
-    title = Paragraph("<b>Pedido de Produtos para Cotação</b>", styles['Title'])
+    title = Paragraph("<b>Pedido de Produtos para Cotação</b>", styles["Title"])
     elements.append(title)
 
     data_atual = datetime.now().strftime("%d/%m/%Y")
-    elements.append(
-        Paragraph(f"<b>Data do Pedido:</b> {data_atual}", styles['Normal']))
+    elements.append(Paragraph(f"<b>Data do Pedido:</b> {data_atual}", styles["Normal"]))
     elements.append(Spacer(1, 15))
 
     data = [["Foto", "Código", "Descrição"]]
 
     for prod in produtos_selecionados:
-        codigo = normalizar_codigo_imagem(prod['Código'])
-        desc = prod['Descrição']
+        codigo = normalizar_codigo_imagem(prod["Código"])
+        desc = prod["Descrição"]
         img_path = img_idx.get(codigo)
 
         img_pdf = ""
@@ -793,34 +837,30 @@ def gerar_pdf_pedido(produtos_selecionados):
                 bg.save(temp_buffer, format="JPEG", quality=95)
                 temp_buffer.seek(0)
 
-                img_pdf = RLImage(temp_buffer, width=45,
-                                  height=45, kind='proportional')
+                img_pdf = RLImage(temp_buffer, width=45, height=45, kind="proportional")
             except Exception:
                 img_pdf = "Sem Foto"
         else:
             img_pdf = "Sem Foto"
 
-        data.append([img_pdf, prod['Código'],
-                    Paragraph(desc, styles['Normal'])])
+        data.append([img_pdf, prod["Código"], Paragraph(desc, styles["Normal"])])
 
-    t = Table(data, colWidths=[70, 100, 360], rowHeights=[
-              30] + [55] * len(produtos_selecionados))
+    t = Table(data, colWidths=[70, 100, 360], rowHeights=[30] + [55] * len(produtos_selecionados))
     t.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#002D62")),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.white),
-        ('GRID', (0, 0), (-1, -1), 1, colors.black),
-        ('LEFTPADDING', (0, 1), (0, -1), 5),
-        ('RIGHTPADDING', (0, 1), (0, -1), 5),
-        ('TOPPADDING', (0, 1), (0, -1), 5),
-        ('BOTTOMPADDING', (0, 1), (0, -1), 5),
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#002D62")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("BACKGROUND", (0, 1), (-1, -1), colors.white),
+        ("GRID", (0, 0), (-1, -1), 1, colors.black),
+        ("LEFTPADDING", (0, 1), (0, -1), 5),
+        ("RIGHTPADDING", (0, 1), (0, -1), 5),
+        ("TOPPADDING", (0, 1), (0, -1), 5),
+        ("BOTTOMPADDING", (0, 1), (0, -1), 5),
     ]))
 
     elements.append(t)
-
     doc.build(elements, onFirstPage=rodape_pdf, onLaterPages=rodape_pdf)
 
     buffer.seek(0)
@@ -828,7 +868,7 @@ def gerar_pdf_pedido(produtos_selecionados):
 
 
 # ==========================================
-# INTERFACE DO STREAMLIT
+# SIDEBAR
 # ==========================================
 with st.sidebar:
     logo_sidebar = obter_logo_destro()
@@ -839,12 +879,12 @@ with st.sidebar:
 
     st.markdown("<div class='destro-section-title'>🛒 Resumo do Pedido</div>", unsafe_allow_html=True)
 
-    carrinho_lista = list(st.session_state['carrinho'].values())
+    carrinho_lista = list(st.session_state["carrinho"].values())
     st.write(f"**Itens selecionados:** {len(carrinho_lista)}")
 
     if len(carrinho_lista) > 0:
         if st.button("🗑️ Limpar Carrinho", use_container_width=True):
-            st.session_state['carrinho'] = {}
+            st.session_state["carrinho"] = {}
             st.rerun()
 
         pdf_buffer = gerar_pdf_pedido(carrinho_lista)
@@ -864,26 +904,41 @@ with st.sidebar:
     df_filtrado = df_raw.copy()
 
     if not df_filtrado.empty:
-        industrias_disp = sorted(
-            [str(x) for x in df_filtrado['Indústria'].dropna().unique() if str(x).strip() != ''])
-        industria_f = st.selectbox("1. Indústria", options=[
-                                   'Todas'] + industrias_disp, on_change=resetar_pagina)
-        if industria_f != 'Todas':
-            df_filtrado = df_filtrado[df_filtrado['Indústria'] == industria_f]
+        industrias_disp = sorted([
+            str(x) for x in df_filtrado["Indústria"].dropna().unique()
+            if str(x).strip() != ""
+        ])
+        industria_f = st.selectbox(
+            "1. Indústria",
+            options=["Todas"] + industrias_disp,
+            on_change=resetar_pagina
+        )
+        if industria_f != "Todas":
+            df_filtrado = df_filtrado[df_filtrado["Indústria"] == industria_f]
 
-        marcas_disp = sorted(
-            [str(x) for x in df_filtrado['Marca'].dropna().unique() if str(x).strip() != ''])
-        marca_f = st.selectbox("2. Marca", options=[
-                               'Todas'] + marcas_disp, on_change=resetar_pagina)
-        if marca_f != 'Todas':
-            df_filtrado = df_filtrado[df_filtrado['Marca'] == marca_f]
+        marcas_disp = sorted([
+            str(x) for x in df_filtrado["Marca"].dropna().unique()
+            if str(x).strip() != ""
+        ])
+        marca_f = st.selectbox(
+            "2. Marca",
+            options=["Todas"] + marcas_disp,
+            on_change=resetar_pagina
+        )
+        if marca_f != "Todas":
+            df_filtrado = df_filtrado[df_filtrado["Marca"] == marca_f]
 
-        cats_disp = sorted([str(x) for x in df_filtrado['Categoria'].dropna(
-        ).unique() if str(x).strip() not in ('', 'Sem Categoria')])
-        categoria_f = st.selectbox("3. Categoria", options=[
-                                   'Todas'] + cats_disp, on_change=resetar_pagina)
-        if categoria_f != 'Todas':
-            df_filtrado = df_filtrado[df_filtrado['Categoria'] == categoria_f]
+        cats_disp = sorted([
+            str(x) for x in df_filtrado["Categoria"].dropna().unique()
+            if str(x).strip() not in ("", "Sem Categoria")
+        ])
+        categoria_f = st.selectbox(
+            "3. Categoria",
+            options=["Todas"] + cats_disp,
+            on_change=resetar_pagina
+        )
+        if categoria_f != "Todas":
+            df_filtrado = df_filtrado[df_filtrado["Categoria"] == categoria_f]
 
 img_idx_global = obter_indice_imagens()
 
@@ -892,28 +947,30 @@ renderizar_topo_destro()
 st.markdown("<div class='destro-section-title'>Catálogo de Produtos</div>", unsafe_allow_html=True)
 
 # ==========================================
-# CAMPO DE BUSCA MANUAL
+# BUSCA MANUAL
 # ==========================================
 st.markdown("<div class='destro-section-title'>Selecionar Produtos Manualmente</div>", unsafe_allow_html=True)
 if not df_filtrado.empty:
-    df_filtrado['Opcao_Busca'] = df_filtrado.apply(
-        lambda x: f"{x['Código']} - {mapear_sinonimos(x['Descrição'])}", axis=1)
+    df_filtrado["Opcao_Busca"] = df_filtrado.apply(
+        lambda x: f"{x['Código']} - {mapear_sinonimos(x['Descrição'])}",
+        axis=1
+    )
 
     def processar_busca_manual():
         val = st.session_state.busca_manual
         if val:
             cod = val.split(" - ")[0].strip()
-            row = df_filtrado[df_filtrado['Código'] == cod].iloc[0]
-            st.session_state['carrinho'][cod] = {
-                'Código': cod,
-                'Descrição': row['Descrição'],
-                'ImgPath': img_idx_global.get(normalizar_codigo_imagem(cod))
+            row = df_filtrado[df_filtrado["Código"] == cod].iloc[0]
+            st.session_state["carrinho"][cod] = {
+                "Código": cod,
+                "Descrição": row["Descrição"],
+                "ImgPath": img_idx_global.get(normalizar_codigo_imagem(cod))
             }
             st.session_state.busca_manual = None
 
     st.selectbox(
         "Selecionar Produtos pelo Nome ou Código",
-        options=df_filtrado['Opcao_Busca'].tolist(),
+        options=df_filtrado["Opcao_Busca"].tolist(),
         index=None,
         placeholder="Digite o nome do produto ou o código interno...",
         key="busca_manual",
@@ -923,26 +980,38 @@ if not df_filtrado.empty:
 
     st.divider()
 
-    # Exibição do Catálogo (Grade)
     itens_por_pagina = 20
-    total_paginas = max(1, len(df_filtrado) // itens_por_pagina +
-                        (1 if len(df_filtrado) % itens_por_pagina > 0 else 0))
+    total_paginas = max(
+        1,
+        len(df_filtrado) // itens_por_pagina + (1 if len(df_filtrado) % itens_por_pagina > 0 else 0)
+    )
 
-    if st.session_state['pagina_atual'] > total_paginas:
-        st.session_state['pagina_atual'] = 1
+    if st.session_state["pagina_atual"] > total_paginas:
+        st.session_state["pagina_atual"] = 1
 
-    pagina_atual = st.session_state['pagina_atual']
+    pagina_atual = st.session_state["pagina_atual"]
 
     col_nav1, col_nav2, col_nav3 = st.columns([1, 2, 1])
     with col_nav1:
-        st.button("⬅️ Página Anterior", on_click=pagina_anterior,
-                  disabled=(pagina_atual == 1), use_container_width=True)
+        st.button(
+            "⬅️ Página Anterior",
+            on_click=pagina_anterior,
+            disabled=(pagina_atual == 1),
+            use_container_width=True
+        )
     with col_nav2:
         st.markdown(
-            f"<h4 style='text-align: center;'>Página {pagina_atual} de {total_paginas}</h4>", unsafe_allow_html=True)
+            f"<h4 style='text-align: center;'>Página {pagina_atual} de {total_paginas}</h4>",
+            unsafe_allow_html=True
+        )
     with col_nav3:
-        st.button("Próxima Página ➡️", on_click=proxima_pagina, disabled=(
-            pagina_atual == total_paginas), use_container_width=True)
+        st.button(
+            "Próxima Página ➡️",
+            on_click=proxima_pagina,
+            disabled=(pagina_atual == total_paginas),
+            use_container_width=True
+        )
+
     st.divider()
 
     inicio = (pagina_atual - 1) * itens_por_pagina
@@ -954,8 +1023,8 @@ if not df_filtrado.empty:
         for j, col in enumerate(cols):
             if i + j < len(df_exibir):
                 row = df_exibir.iloc[i + j]
-                cod = row['Código']
-                desc = row['Descrição']
+                cod = row["Código"]
+                desc = row["Descrição"]
                 cod_img = normalizar_codigo_imagem(cod)
                 img_path = img_idx_global.get(cod_img)
 
@@ -973,31 +1042,44 @@ if not df_filtrado.empty:
                         desc_curta = desc if len(desc) <= 45 else desc[:42] + "..."
                         st.caption(desc_curta)
 
-                        no_carrinho = cod in st.session_state['carrinho']
+                        no_carrinho = cod in st.session_state["carrinho"]
                         if no_carrinho:
-                            if st.button("❌ Remover", key=f"btn_rem_{cod}", use_container_width=True):
-                                del st.session_state['carrinho'][cod]
+                            if st.button(f"❌ Remover", key=f"btn_rem_{cod}", use_container_width=True):
+                                del st.session_state["carrinho"][cod]
                                 st.rerun()
                         else:
-                            if st.button("➕ Adicionar", key=f"btn_add_{cod}", type="primary", use_container_width=True):
-                                st.session_state['carrinho'][cod] = {
-                                    'Código': cod,
-                                    'Descrição': desc,
-                                    'ImgPath': img_path
+                            if st.button(f"➕ Adicionar", key=f"btn_add_{cod}", type="primary", use_container_width=True):
+                                st.session_state["carrinho"][cod] = {
+                                    "Código": cod,
+                                    "Descrição": desc,
+                                    "ImgPath": img_path
                                 }
                                 st.rerun()
 
     st.divider()
+
     col_nav1_bot, col_nav2_bot, col_nav3_bot = st.columns([1, 2, 1])
     with col_nav1_bot:
-        st.button("⬅️ Página Anterior ", key="ant_bot", on_click=pagina_anterior, disabled=(
-            pagina_atual == 1), use_container_width=True)
+        st.button(
+            "⬅️ Página Anterior ",
+            key="ant_bot",
+            on_click=pagina_anterior,
+            disabled=(pagina_atual == 1),
+            use_container_width=True
+        )
     with col_nav2_bot:
         st.markdown(
-            f"<h4 style='text-align: center;'>Página {pagina_atual} de {total_paginas}</h4>", unsafe_allow_html=True)
+            f"<h4 style='text-align: center;'>Página {pagina_atual} de {total_paginas}</h4>",
+            unsafe_allow_html=True
+        )
     with col_nav3_bot:
-        st.button("Próxima Página ➡️ ", key="prox_bot", on_click=proxima_pagina, disabled=(
-            pagina_atual == total_paginas), use_container_width=True)
+        st.button(
+            "Próxima Página ➡️ ",
+            key="prox_bot",
+            on_click=proxima_pagina,
+            disabled=(pagina_atual == total_paginas),
+            use_container_width=True
+        )
 
 else:
     st.warning("Nenhum produto encontrado com os filtros selecionados.")
@@ -1008,53 +1090,69 @@ else:
 st.divider()
 st.markdown("<div class='destro-section-title'>📋 Produtos no seu Carrinho</div>", unsafe_allow_html=True)
 
-if len(st.session_state['carrinho']) > 0:
+if len(st.session_state["carrinho"]) > 0:
+    st.markdown("""
+    <div class='cart-header'>
+        <div>Foto</div>
+        <div>Código</div>
+        <div>Descrição</div>
+        <div>Ação</div>
+    </div>
+    """, unsafe_allow_html=True)
 
-    c_tab, c_btn = st.columns([9, 1])
+    itens_carrinho = list(st.session_state["carrinho"].items())
 
-    with c_tab:
-        tabela_html = """<table class='tabela-carrinho'>
-<tr>
-<th style='width: 10%;'>Foto</th>
-<th style='width: 25%;'>Código</th>
-<th style='width: 65%;'>Descrição</th>
-</tr>"""
+    for idx, (cod, prod) in enumerate(itens_carrinho):
+        img_path = prod.get("ImgPath")
+        base64_img = imagem_para_base64(img_path)
+        img_tag = (
+            f"<img class='cart-thumb' src='data:image/jpeg;base64,{base64_img}'>"
+            if base64_img else
+            "<span style='color:#94a3b8; font-size:11px; font-weight:800;'>Sem foto</span>"
+        )
 
-        for cod, prod in list(st.session_state['carrinho'].items()):
-            img_path = prod.get('ImgPath')
-            base64_img = imagem_para_base64(img_path)
+        bg = "#ffffff" if idx % 2 == 0 else "#fbfdff"
 
-            img_tag = f"<img src='data:image/jpeg;base64,{base64_img}'>" if base64_img else "<span style='color: gray; font-size: 8px;'>S/F</span>"
+        col1, col2, col3, col4 = st.columns([1.1, 1.8, 6.1, 1.0], vertical_alignment="center")
 
-            linha = f"""<tr>
-<td>{img_tag}</td>
-<td>{cod}</td>
-<td>{prod['Descrição']}</td>
-</tr>"""
-            tabela_html += linha
+        with col1:
+            st.markdown(
+                f"<div class='cart-col' style='background:{bg}; border-left:1px solid #e2e8f0;'>{img_tag}</div>",
+                unsafe_allow_html=True
+            )
 
-        tabela_html += "</table>"
-        st.html(tabela_html)
+        with col2:
+            st.markdown(
+                f"<div class='cart-col' style='background:{bg};'>{cod}</div>",
+                unsafe_allow_html=True
+            )
 
-    with c_btn:
-        st.markdown("<div style='height: 52px; margin:0; padding:0;'></div>", unsafe_allow_html=True)
+        with col3:
+            st.markdown(
+                f"<div class='cart-col cart-col-desc' style='background:{bg};'>{prod['Descrição']}</div>",
+                unsafe_allow_html=True
+            )
 
-        for cod in list(st.session_state['carrinho'].keys()):
+        with col4:
+            st.markdown(
+                f"<div class='cart-remove-shell' style='background:{bg}; border-right:1px solid #e2e8f0; border-bottom:1px solid #e2e8f0;'>",
+                unsafe_allow_html=True
+            )
             if st.button("🗑️", key=f"lista_rem_{cod}", help="Remover", use_container_width=True):
-                del st.session_state['carrinho'][cod]
+                del st.session_state["carrinho"][cod]
                 st.rerun()
+            st.markdown("</div>", unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
     c_espaco1, btn_limpar, btn_baixar, c_espaco2 = st.columns([2, 2, 2, 2])
 
     with btn_limpar:
         if st.button("🗑️ Limpar Carrinho", key="botao_limpar_rodape", use_container_width=True):
-            st.session_state['carrinho'] = {}
+            st.session_state["carrinho"] = {}
             st.rerun()
 
     with btn_baixar:
-        pdf_buffer_fim = gerar_pdf_pedido(
-            list(st.session_state['carrinho'].values()))
+        pdf_buffer_fim = gerar_pdf_pedido(list(st.session_state["carrinho"].values()))
         st.download_button(
             label="📥 Baixar PDF",
             data=pdf_buffer_fim,
@@ -1065,5 +1163,4 @@ if len(st.session_state['carrinho']) > 0:
             key="botao_baixar_rodape"
         )
 else:
-    st.info(
-        "Nenhum produto adicionado ainda. Escolha produtos na vitrine ou na busca acima.")
+    st.info("Nenhum produto adicionado ainda. Escolha produtos na vitrine ou na busca acima.")
