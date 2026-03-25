@@ -364,109 +364,72 @@ st.markdown("""
         font-weight: 600;
     }
 
-    .cart-head-cell {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        min-height: 48px;
+    /* ---- TABELA CARRINHO ---- */
+    .tabela-carrinho {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        overflow: hidden;
+        border: 1px solid #e2e8f0;
+        border-radius: 18px;
+        box-shadow: var(--destro-shadow);
+        background: white;
+        font-family: Arial, sans-serif;
+    }
+
+    .tabela-carrinho th {
+        text-align: center;
         padding: 10px 8px;
         background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
         border-bottom: 1px solid #1e293b;
         font-size: 13px;
         font-weight: 800;
         color: #f8fafc;
-        margin: 0;
     }
 
-    .cart-head-left {
-        border-radius: 18px 0 0 0;
-        border-left: 1px solid #1e293b;
-        margin-right: -0.35rem;
-    }
-
-    .cart-head-mid {
-        margin-left: -0.35rem;
-        margin-right: -0.35rem;
-    }
-
-    .cart-head-right {
-        border-radius: 0 18px 0 0;
-        border-right: 1px solid #1e293b;
-        margin-left: -0.35rem;
-    }
-
-    .cart-row-cell {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        min-height: 72px;
+    .tabela-carrinho td {
+        text-align: center;
         padding: 10px 12px !important;
         border-bottom: 1px solid #e2e8f0;
+        min-height: 72px !important;
         font-size: 12px !important;
         font-weight: 700;
         color: #1e293b;
+        vertical-align: middle;
         background: white;
-        margin: 0;
     }
 
-    .cart-row-even {
-        background: #fbfdff !important;
+    .tabela-carrinho tr:nth-child(even) td {
+        background: #fbfdff;
     }
 
-    .cart-row-left {
-        border-left: 1px solid #e2e8f0;
-        margin-right: -0.35rem;
+    .tabela-carrinho img {
+        height: 38px !important;
+        width: 38px !important;
+        object-fit: contain !important;
+        vertical-align: middle;
+        display: block;
+        margin: 0 auto;
     }
 
-    .cart-row-mid {
-        margin-left: -0.35rem;
-        margin-right: -0.35rem;
-    }
-
-    .cart-row-right {
-        border-right: 1px solid #e2e8f0;
-        margin-left: -0.35rem;
-    }
-
-    .cart-row-bottom-left {
-        border-radius: 0 0 0 18px;
-    }
-
-    .cart-row-bottom-right {
-        border-radius: 0 0 18px 0;
-    }
-
-    .cart-col-desc {
-        justify-content: flex-start;
+    .tabela-carrinho .col-desc {
         text-align: left;
         padding-left: 18px !important;
         padding-right: 18px !important;
     }
 
-    .cart-thumb {
-        height: 38px !important;
-        width: 38px !important;
-        object-fit: contain !important;
-        display: block;
-        margin: 0 auto;
+    .cart-del-btn {
+        background: none;
+        border: 1px solid #d9e2ef;
+        border-radius: 10px;
+        font-size: 18px;
+        cursor: pointer;
+        padding: 6px 10px;
+        transition: background .15s;
     }
 
-    .cart-remove-shell {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 100%;
-    }
-
-    .cart-remove-shell div[data-testid="stButton"] {
-        width: 100%;
-        margin: 0 !important;
-    }
-
-    .cart-remove-shell div[data-testid="stButton"] > button {
-        min-height: 54px !important;
-        height: 54px !important;
-        border-radius: 14px !important;
+    .cart-del-btn:hover {
+        background: #fff0f0;
     }
 
     div[data-testid="column"] button {
@@ -581,11 +544,7 @@ def renderizar_topo_destro():
                 '>
                     <img
                         src='data:image/{ext_logo};base64,{b64_logo}'
-                        style='
-                            max-width: 280px;
-                            width: 100%;
-                            object-fit: contain;
-                        '
+                        style='max-width: 280px; width: 100%; object-fit: contain;'
                     >
                 </div>
                 <div class='destro-soft-card' style='padding: 18px 18px 16px 18px; flex-shrink: 0;'>
@@ -1099,50 +1058,73 @@ st.divider()
 st.markdown("<div class='destro-section-title'>📋 Produtos no seu Carrinho</div>", unsafe_allow_html=True)
 
 if len(st.session_state["carrinho"]) > 0:
-    h1, h2, h3, h4 = st.columns([1.1, 1.8, 6.1, 1.0], vertical_alignment="center")
-    with h1:
-        st.markdown("<div class='cart-head-cell cart-head-left'>Foto</div>", unsafe_allow_html=True)
-    with h2:
-        st.markdown("<div class='cart-head-cell cart-head-mid'>Código</div>", unsafe_allow_html=True)
-    with h3:
-        st.markdown("<div class='cart-head-cell cart-head-mid'>Descrição</div>", unsafe_allow_html=True)
-    with h4:
-        st.markdown("<div class='cart-head-cell cart-head-right'>Ação</div>", unsafe_allow_html=True)
-
     itens_carrinho = list(st.session_state["carrinho"].items())
     total_itens = len(itens_carrinho)
 
-    for idx, (cod, prod) in enumerate(itens_carrinho):
+    # HTML table completa (foto, código, descrição, ação com botão HTML)
+    tabela_html = """<table class='tabela-carrinho'>
+<tr>
+  <th style='width:10%;'>Foto</th>
+  <th style='width:20%;'>Código</th>
+  <th style='width:58%;'>Descrição</th>
+  <th style='width:12%;'>Ação</th>
+</tr>"""
+
+    for i, (cod, prod) in enumerate(itens_carrinho):
         img_path = prod.get("ImgPath")
         base64_img = imagem_para_base64(img_path)
         img_tag = (
-            f"<img class='cart-thumb' src='data:image/jpeg;base64,{base64_img}'>"
+            f"<img src='data:image/jpeg;base64,{base64_img}'>"
             if base64_img else
-            "<span style='color:#94a3b8; font-size:11px; font-weight:800;'>Sem foto</span>"
+            "<span style='color:#94a3b8;font-size:11px;font-weight:800;'>Sem foto</span>"
         )
-        linha_bg = " cart-row-even" if idx % 2 else ""
-        is_last = idx == total_itens - 1
-        left_extra = " cart-row-bottom-left" if is_last else ""
-        right_extra = " cart-row-bottom-right" if is_last else ""
+        tabela_html += f"""<tr>
+  <td>{img_tag}</td>
+  <td>{cod}</td>
+  <td class='col-desc'>{prod['Descrição']}</td>
+  <td>
+    <button
+      class='cart-del-btn'
+      onclick="(function(){{
+        var btns = window.parent.document.querySelectorAll('button[data-cart-del]');
+        if(btns[{i}]) btns[{i}].click();
+      }})()"
+    >🗑️</button>
+  </td>
+</tr>"""
 
-        c1, c2, c3, c4 = st.columns([1.1, 1.8, 6.1, 1.0], vertical_alignment="center")
-        with c1:
-            st.markdown(f"<div class='cart-row-cell cart-row-left{linha_bg}{left_extra}'>{img_tag}</div>", unsafe_allow_html=True)
-        with c2:
-            st.markdown(f"<div class='cart-row-cell cart-row-mid{linha_bg}'>{cod}</div>", unsafe_allow_html=True)
-        with c3:
-            st.markdown(f"<div class='cart-row-cell cart-row-mid cart-col-desc{linha_bg}'>{prod['Descrição']}</div>", unsafe_allow_html=True)
-        with c4:
-            st.markdown(f"<div class='cart-row-cell cart-row-right{linha_bg}{right_extra}'><div class='cart-remove-shell'>", unsafe_allow_html=True)
-            st.button(
-                "🗑️",
-                key=f"lista_rem_{cod}",
-                help="Remover",
-                use_container_width=True,
-                on_click=remover_item_carrinho,
-                args=(cod,)
-            )
-            st.markdown("</div></div>", unsafe_allow_html=True)
+    tabela_html += "</table>"
+    st.html(tabela_html)
+
+    # Botões Streamlit ocultos (acionados pelo JS da tabela acima)
+    for cod, _ in itens_carrinho:
+        st.button(
+            "🗑️",
+            key=f"lista_rem_{cod}",
+            on_click=remover_item_carrinho,
+            args=(cod,),
+            help="Remover"
+        )
+
+    # JS: oculta os botões Streamlit e adiciona atributo data-cart-del para o onclick da tabela
+    st.html("""<script>
+(function() {
+  function tagButtons() {
+    var allBtns = window.parent.document.querySelectorAll('button');
+    var tagged = 0;
+    allBtns.forEach(function(b) {
+      if (b.innerText.trim() === '\uD83D\uDDD1\uFE0F' && !b.closest('.tabela-carrinho')) {
+        b.setAttribute('data-cart-del', tagged);
+        b.style.display = 'none';
+        tagged++;
+      }
+    });
+  }
+  tagButtons();
+  setTimeout(tagButtons, 300);
+  setTimeout(tagButtons, 800);
+})();
+</script>""")
 
     st.markdown("<br>", unsafe_allow_html=True)
     c_espaco1, btn_limpar, btn_baixar, c_espaco2 = st.columns([2, 2, 2, 2])
