@@ -264,9 +264,7 @@ st.markdown("""
         letter-spacing: -0.02em;
     }
 
-    h1 {
-        font-weight: 900 !important;
-    }
+    h1 { font-weight: 900 !important; }
 
     div[data-testid="stMetric"] {
         background: linear-gradient(180deg, #ffffff 0%, #f9fbff 100%);
@@ -365,72 +363,82 @@ st.markdown("""
     }
 
     /* ---- TABELA CARRINHO ---- */
-    .tabela-carrinho {
-        width: 100%;
-        border-collapse: separate;
-        border-spacing: 0;
-        overflow: hidden;
-        border: 1px solid #e2e8f0;
-        border-radius: 18px;
-        box-shadow: var(--destro-shadow);
-        background: white;
-        font-family: Arial, sans-serif;
-    }
-
-    .tabela-carrinho th {
-        text-align: center;
-        padding: 10px 8px;
+    .cart-th-left {
+        display: flex;
+        align-items: center;
+        min-height: 48px;
         background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-        border-bottom: 1px solid #1e293b;
+        border: 1px solid #1e293b;
+        border-right: none;
+        border-radius: 18px 0 0 0;
+    }
+    .cart-th-left > span {
+        flex: 1;
+        padding: 10px 8px;
+        font-size: 13px;
+        font-weight: 800;
+        color: #f8fafc;
+        text-align: center;
+    }
+    .cart-th-right {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 48px;
+        background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+        border: 1px solid #1e293b;
+        border-left: none;
+        border-radius: 0 18px 0 0;
+        padding: 10px 8px;
         font-size: 13px;
         font-weight: 800;
         color: #f8fafc;
     }
-
-    .tabela-carrinho td {
-        text-align: center;
-        padding: 10px 12px !important;
-        border-bottom: 1px solid #e2e8f0;
-        min-height: 72px !important;
-        font-size: 12px !important;
-        font-weight: 700;
-        color: #1e293b;
-        vertical-align: middle;
+    .cart-td-left {
+        display: flex;
+        align-items: center;
+        min-height: 72px;
         background: white;
+        border: 1px solid #e2e8f0;
+        border-right: none;
+        border-top: none;
     }
+    .cart-td-even { background: #fbfdff !important; }
+    .cart-td-last  { border-radius: 0 0 0 18px; }
+    .cart-td-left .c-img  { flex: 0 0 12%; display:flex; justify-content:center; align-items:center; padding:8px; }
+    .cart-td-left .c-cod  { flex: 0 0 20%; text-align:center; font-size:12px; font-weight:700; color:#1e293b; padding:0 8px; }
+    .cart-td-left .c-desc { flex: 1; text-align:left; font-size:12px; font-weight:700; color:#1e293b; padding:0 18px; }
+    .cart-td-left img { height:38px !important; width:38px !important; object-fit:contain !important; display:block; margin:0 auto; }
 
-    .tabela-carrinho tr:nth-child(even) td {
-        background: #fbfdff;
+    div[data-testid="stHorizontalBlock"]:has(.cart-th-left),
+    div[data-testid="stHorizontalBlock"]:has(.cart-td-left) {
+        gap: 0 !important;
+        margin-bottom: 0 !important;
     }
-
-    .tabela-carrinho img {
-        height: 38px !important;
-        width: 38px !important;
-        object-fit: contain !important;
-        vertical-align: middle;
-        display: block;
-        margin: 0 auto;
+    div[data-testid="stHorizontalBlock"]:has(.cart-th-left) > div[data-testid="column"],
+    div[data-testid="stHorizontalBlock"]:has(.cart-td-left) > div[data-testid="column"] {
+        padding: 0 !important;
     }
-
-    .tabela-carrinho .col-desc {
-        text-align: left;
-        padding-left: 18px !important;
-        padding-right: 18px !important;
-    }
-
-    .cart-del-btn {
-        background: none;
-        border: 1px solid #d9e2ef;
-        border-radius: 10px;
-        font-size: 18px;
-        cursor: pointer;
-        padding: 6px 10px;
-        transition: background .15s;
-    }
-
-    .cart-del-btn:hover {
-        background: #fff0f0;
-    }
+    div[data-testid="stHorizontalBlock"]:has(.cart-td-left) > div[data-testid="column"]:last-child
+        div[data-testid="stVerticalBlock"] { gap: 0 !important; }
+    div[data-testid="stHorizontalBlock"]:has(.cart-td-left) > div[data-testid="column"]:last-child
+        div[data-testid="stButton"] > button {
+            height: 72px !important;
+            min-height: 72px !important;
+            width: 100% !important;
+            border-radius: 0 !important;
+            border: 1px solid #e2e8f0 !important;
+            border-top: none !important;
+            box-shadow: none !important;
+            background: white !important;
+            font-size: 18px !important;
+            margin: 0 !important;
+        }
+    div[data-testid="stHorizontalBlock"]:has(.cart-td-left) > div[data-testid="column"]:last-child
+        div[data-testid="stButton"] > button:hover {
+            background: #fff5f5 !important;
+            transform: none !important;
+        }
 
     div[data-testid="column"] button {
         padding: 0 !important;
@@ -453,16 +461,9 @@ st.markdown("""
     }
 
     @media (max-width: 900px) {
-        .destro-hero-grid {
-            grid-template-columns: 1fr;
-        }
-        .destro-title {
-            font-size: 1.8rem;
-        }
-        .destro-topbar {
-            flex-direction: column;
-            align-items: flex-start;
-        }
+        .destro-hero-grid { grid-template-columns: 1fr; }
+        .destro-title { font-size: 1.8rem; }
+        .destro-topbar { flex-direction: column; align-items: flex-start; }
     }
 </style>
 """, unsafe_allow_html=True)
@@ -527,27 +528,12 @@ def renderizar_topo_destro():
         b64_logo, ext_logo = logo_destro_base64()
         if b64_logo:
             st.markdown(f"""
-            <div style='
-                display: flex;
-                flex-direction: column;
-                justify-content: space-between;
-                height: 100%;
-                min-height: 320px;
-                gap: 14px;
-            '>
-                <div style='
-                    flex: 1;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    overflow: hidden;
-                '>
-                    <img
-                        src='data:image/{ext_logo};base64,{b64_logo}'
-                        style='max-width: 280px; width: 100%; object-fit: contain;'
-                    >
+            <div style='display:flex; flex-direction:column; justify-content:space-between; height:100%; min-height:320px; gap:14px;'>
+                <div style='flex:1; display:flex; align-items:center; justify-content:center; overflow:hidden;'>
+                    <img src='data:image/{ext_logo};base64,{b64_logo}'
+                         style='max-width:280px; width:100%; object-fit:contain;'>
                 </div>
-                <div class='destro-soft-card' style='padding: 18px 18px 16px 18px; flex-shrink: 0;'>
+                <div class='destro-soft-card' style='padding:18px 18px 16px 18px; flex-shrink:0;'>
                     <div style='font-size:12px; font-weight:800; color:#d72638; text-transform:uppercase; letter-spacing:.08em; margin-bottom:10px;'>Como utilizar</div>
                     <div style='font-size:.97rem; line-height:1.7; color:#334155;'>Selecione os produtos pelo botão de + ou digitando o nome ou código, utilize os filtros para encontrar a marca desejada, remova itens se necessário, gere o PDF do pedido para cotação, baixe o arquivo e envie ao seu representante para receber o atendimento com mais rapidez.</div>
                 </div>
@@ -723,24 +709,19 @@ def carregar_dados():
         mask_categoria = cat_raw.str.match(r'^\s*\d{1,3}\s*-\s*.+')
         df['Categoria'] = cat_raw.where(mask_categoria, other=None).ffill().apply(manter_categoria_completa)
         df['Categoria'] = df['Categoria'].replace('', 'Sem Categoria').fillna('Sem Categoria')
-
         df['Código'] = df[0].astype(str)
         df['Descrição'] = df[2].astype(str).str.strip("* ")
-
         df = df[
             (df['Descrição'].str.strip().str.lower() != 'nan') &
             (df['Descrição'].str.strip() != '')
         ]
-
         df['Desc_Norm'] = df['Descrição'].apply(
             lambda x: re.sub(r'\s+', ' ', str(x).strip().upper()))
         df['Indústria'] = df['Desc_Norm'].map(dict_bateu_ind).fillna('Sem Indústria')
         df['Marca'] = df['Desc_Norm'].map(dict_bateu_mar)
-
         mask_missing = df['Marca'].isna() | (df['Marca'] == '')
         if mask_missing.any():
             df.loc[mask_missing, 'Marca'] = df.loc[mask_missing, 'Desc_Norm'].apply(achar_marca)
-
         return df[['Código', 'Descrição', 'Indústria', 'Marca', 'Categoria']].drop_duplicates()
 
     except Exception as e:
@@ -811,29 +792,21 @@ def rodape_pdf(canvas, doc):
 def gerar_pdf_pedido(produtos_selecionados):
     img_idx = obter_indice_imagens()
     buffer = BytesIO()
-
-    doc = SimpleDocTemplate(
-        buffer, pagesize=letter,
-        rightMargin=30, leftMargin=30,
-        topMargin=30, bottomMargin=40
-    )
+    doc = SimpleDocTemplate(buffer, pagesize=letter,
+                            rightMargin=30, leftMargin=30,
+                            topMargin=30, bottomMargin=40)
     styles = getSampleStyleSheet()
     elements = []
-
     title = Paragraph("<b>Pedido de Produtos para Cotação</b>", styles['Title'])
     elements.append(title)
-
     data_atual = datetime.now().strftime("%d/%m/%Y")
     elements.append(Paragraph(f"<b>Data do Pedido:</b> {data_atual}", styles['Normal']))
     elements.append(Spacer(1, 15))
-
     data = [["Foto", "Código", "Descrição"]]
-
     for prod in produtos_selecionados:
         codigo = normalizar_codigo_imagem(prod['Código'])
         desc = prod['Descrição']
         img_path = img_idx.get(codigo)
-
         img_pdf = ""
         if img_path and os.path.exists(img_path):
             try:
@@ -853,9 +826,7 @@ def gerar_pdf_pedido(produtos_selecionados):
                 img_pdf = "Sem Foto"
         else:
             img_pdf = "Sem Foto"
-
         data.append([img_pdf, prod['Código'], Paragraph(desc, styles['Normal'])])
-
     t = Table(data, colWidths=[70, 100, 360], rowHeights=[30] + [55] * len(produtos_selecionados))
     t.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#002D62")),
@@ -870,7 +841,6 @@ def gerar_pdf_pedido(produtos_selecionados):
         ('TOPPADDING', (0, 1), (0, -1), 5),
         ('BOTTOMPADDING', (0, 1), (0, -1), 5),
     ]))
-
     elements.append(t)
     doc.build(elements, onFirstPage=rodape_pdf, onLaterPages=rodape_pdf)
     buffer.seek(0)
@@ -888,7 +858,6 @@ with st.sidebar:
             st.image(logo_sidebar, use_container_width=True)
 
     st.markdown("<div class='destro-section-title'>🛒 Resumo do Pedido</div>", unsafe_allow_html=True)
-
     carrinho_lista = list(st.session_state['carrinho'].values())
     st.write(f"**Itens selecionados:** {len(carrinho_lista)}")
 
@@ -896,7 +865,6 @@ with st.sidebar:
         if st.button("🗑️ Limpar Carrinho", use_container_width=True):
             st.session_state['carrinho'] = {}
             st.rerun()
-
         pdf_buffer = gerar_pdf_pedido(carrinho_lista)
         if pdf_buffer:
             st.download_button(
@@ -1016,7 +984,6 @@ if not df_filtrado.empty:
                                 "<div style='height:180px; display:flex; align-items:center; justify-content:center; background:linear-gradient(180deg,#ffffff 0%,#f8fafc 100%); color:#64748b; margin-bottom:1rem; border-radius:18px; border:1px solid #edf2f7; text-align:center;'>Sem Imagem</div>",
                                 unsafe_allow_html=True
                             )
-
                         st.markdown(f"**Cód: {cod}**")
                         desc_curta = desc if len(desc) <= 45 else desc[:42] + "..."
                         st.caption(desc_curta)
@@ -1061,16 +1028,19 @@ if len(st.session_state["carrinho"]) > 0:
     itens_carrinho = list(st.session_state["carrinho"].items())
     total_itens = len(itens_carrinho)
 
-    # HTML table completa (foto, código, descrição, ação com botão HTML)
-    tabela_html = """<table class='tabela-carrinho'>
-<tr>
-  <th style='width:10%;'>Foto</th>
-  <th style='width:20%;'>Código</th>
-  <th style='width:58%;'>Descrição</th>
-  <th style='width:12%;'>Ação</th>
-</tr>"""
+    # Cabeçalho
+    ch_data, ch_btn = st.columns([9, 1])
+    with ch_data:
+        st.markdown("""<div class='cart-th-left'>
+            <span style='flex:0 0 12%;'>Foto</span>
+            <span style='flex:0 0 20%;'>Código</span>
+            <span style='flex:1;'>Descrição</span>
+        </div>""", unsafe_allow_html=True)
+    with ch_btn:
+        st.markdown("<div class='cart-th-right'>Ação</div>", unsafe_allow_html=True)
 
-    for i, (cod, prod) in enumerate(itens_carrinho):
+    # Linhas
+    for idx, (cod, prod) in enumerate(itens_carrinho):
         img_path = prod.get("ImgPath")
         base64_img = imagem_para_base64(img_path)
         img_tag = (
@@ -1078,53 +1048,25 @@ if len(st.session_state["carrinho"]) > 0:
             if base64_img else
             "<span style='color:#94a3b8;font-size:11px;font-weight:800;'>Sem foto</span>"
         )
-        tabela_html += f"""<tr>
-  <td>{img_tag}</td>
-  <td>{cod}</td>
-  <td class='col-desc'>{prod['Descrição']}</td>
-  <td>
-    <button
-      class='cart-del-btn'
-      onclick="(function(){{
-        var btns = window.parent.document.querySelectorAll('button[data-cart-del]');
-        if(btns[{i}]) btns[{i}].click();
-      }})()"
-    >🗑️</button>
-  </td>
-</tr>"""
+        is_last = idx == total_itens - 1
+        extra_cls = (" cart-td-even" if idx % 2 else "") + (" cart-td-last" if is_last else "")
 
-    tabela_html += "</table>"
-    st.html(tabela_html)
-
-    # Botões Streamlit ocultos (acionados pelo JS da tabela acima)
-    for cod, _ in itens_carrinho:
-        st.button(
-            "🗑️",
-            key=f"lista_rem_{cod}",
-            on_click=remover_item_carrinho,
-            args=(cod,),
-            help="Remover"
-        )
-
-    # JS: oculta os botões Streamlit e adiciona atributo data-cart-del para o onclick da tabela
-    st.html("""<script>
-(function() {
-  function tagButtons() {
-    var allBtns = window.parent.document.querySelectorAll('button');
-    var tagged = 0;
-    allBtns.forEach(function(b) {
-      if (b.innerText.trim() === '\uD83D\uDDD1\uFE0F' && !b.closest('.tabela-carrinho')) {
-        b.setAttribute('data-cart-del', tagged);
-        b.style.display = 'none';
-        tagged++;
-      }
-    });
-  }
-  tagButtons();
-  setTimeout(tagButtons, 300);
-  setTimeout(tagButtons, 800);
-})();
-</script>""")
+        cr_data, cr_btn = st.columns([9, 1], vertical_alignment="center")
+        with cr_data:
+            st.markdown(f"""<div class='cart-td-left{extra_cls}'>
+                <div class='c-img'>{img_tag}</div>
+                <div class='c-cod'>{cod}</div>
+                <div class='c-desc'>{prod['Descrição']}</div>
+            </div>""", unsafe_allow_html=True)
+        with cr_btn:
+            st.button(
+                "🗑️",
+                key=f"lista_rem_{cod}",
+                help="Remover",
+                use_container_width=True,
+                on_click=remover_item_carrinho,
+                args=(cod,)
+            )
 
     st.markdown("<br>", unsafe_allow_html=True)
     c_espaco1, btn_limpar, btn_baixar, c_espaco2 = st.columns([2, 2, 2, 2])
