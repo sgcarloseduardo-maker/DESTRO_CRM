@@ -101,6 +101,15 @@ st.markdown("""
         box-shadow: var(--destro-shadow);
     }
 
+    .destro-topbar::after {
+        content: '';
+        width: 120px;
+        height: 4px;
+        border-radius: 999px;
+        background: linear-gradient(90deg, #d72638 0%, #fb7185 100%);
+        box-shadow: 0 6px 16px rgba(215, 38, 56, 0.25);
+    }
+
     .destro-topbar-left {
         display: flex;
         align-items: center;
@@ -237,6 +246,12 @@ st.markdown("""
         padding: 12px 14px;
     }
 
+    .destro-soft-card,
+    div[data-testid="stAlert"],
+    div[data-testid="stForm"] {
+        backdrop-filter: blur(8px);
+    }
+
     .destro-footer-note {
         text-align: right;
         color: #7c8ba1;
@@ -261,6 +276,10 @@ st.markdown("""
         border-radius: 18px;
         padding: 12px 14px;
         box-shadow: var(--destro-shadow);
+    }
+
+    div[data-testid="stButton"] {
+        margin-bottom: 0 !important;
     }
 
     div[data-testid="stButton"] > button {
@@ -335,6 +354,7 @@ st.markdown("""
         overflow: hidden;
         border-radius: 18px;
         border: 1px solid #edf2f7;
+        text-align: center;
     }
 
     div[data-testid="stImage"] img {
@@ -404,7 +424,7 @@ st.markdown("""
 
     div[data-testid="column"] button {
         padding: 0 !important;
-        margin: 0px 0px 4px 0px !important;
+        margin: 0px !important;
         min-height: 52px !important;
         height: 52px !important;
         font-size: 13px !important;
@@ -474,13 +494,13 @@ def renderizar_topo_destro():
             <div class='destro-hero-grid'>
                 <div>
                     <div class='destro-kicker'>Plataforma Comercial</div>
-                    <h1 class='destro-title'>Catálogo de Pedidos DESTRO</h1>
-                    <p class='destro-subtitle'>Escolha seus produtos com facilidade, monte seu pedido em poucos cliques e baixe o PDF final para enviar com praticidade.</p>
+                    <h1 class='destro-title'>Catálogo de Pedidos para Cotação DESTRO</h1>
+                    <p class='destro-subtitle'>Escolha seus produtos com facilidade, monte seu pedido em poucos cliques e baixe o PDF final e envie para seu representante.</p>
                 </div>
                 <div class='destro-info-card'>
                     <div class='destro-info-card-title'>Atendimento rápido</div>
-                    <strong>Pedido simples e organizado</strong>
-                    <div class='destro-mini-note'>Navegue com facilidade, visualize melhor os produtos e finalize seu pedido de forma clara, rápida e segura.</div>
+                    <strong>Pedido de Cotação simples e organizado</strong>
+                    <div class='destro-mini-note'>Navegue com facilidade, visualize melhor os produtos e finalize seu pedido de forma clara e rápida, DICA: Utilize os filtros para encontrar a marca que você precisa!.</div>
                 </div>
             </div>
         </div>
@@ -488,7 +508,9 @@ def renderizar_topo_destro():
 
     with hero_col2:
         if logo_path:
-            st.image(logo_path, use_container_width=True)
+            c1, c2, c3 = st.columns([1, 6, 1])
+            with c2:
+                st.image(logo_path, use_container_width=True)
         else:
             st.markdown("""
             <div class='destro-soft-card' style='min-height: 210px; display:flex; align-items:center; justify-content:center; text-align:center;'>
@@ -738,7 +760,7 @@ def gerar_pdf_pedido(produtos_selecionados):
     styles = getSampleStyleSheet()
     elements = []
 
-    title = Paragraph("<b>Meu Pedido de Produtos</b>", styles['Title'])
+    title = Paragraph("<b>Pedido de Produtos para Cotação</b>", styles['Title'])
     elements.append(title)
 
     data_atual = datetime.now().strftime("%d/%m/%Y")
@@ -811,7 +833,9 @@ def gerar_pdf_pedido(produtos_selecionados):
 with st.sidebar:
     logo_sidebar = obter_logo_destro()
     if logo_sidebar:
-        st.image(logo_sidebar, use_container_width=True)
+        s1, s2, s3 = st.columns([1, 6, 1])
+        with s2:
+            st.image(logo_sidebar, use_container_width=True)
 
     st.markdown("<div class='destro-section-title'>🛒 Resumo do Pedido</div>", unsafe_allow_html=True)
 
@@ -941,7 +965,7 @@ if not df_filtrado.empty:
                             st.image(img_path, use_container_width=True)
                         else:
                             st.markdown(
-                                "<div style='height: 180px; display: flex; align-items: center; justify-content: center; background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%); color: #64748b; margin-bottom: 1rem; border-radius: 18px; border: 1px solid #edf2f7;'>Sem Imagem</div>",
+                                "<div style='height: 180px; display: flex; align-items: center; justify-content: center; background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%); color: #64748b; margin-bottom: 1rem; border-radius: 18px; border: 1px solid #edf2f7; text-align:center;'>Sem Imagem</div>",
                                 unsafe_allow_html=True
                             )
 
@@ -1013,7 +1037,7 @@ if len(st.session_state['carrinho']) > 0:
         st.html(tabela_html)
 
     with c_btn:
-        st.markdown("<div style='height: 52px;'></div>", unsafe_allow_html=True)
+        st.markdown("<div style='height: 52px; margin:0; padding:0;'></div>", unsafe_allow_html=True)
 
         for cod in list(st.session_state['carrinho'].keys()):
             if st.button("🗑️", key=f"lista_rem_{cod}", help="Remover", use_container_width=True):
