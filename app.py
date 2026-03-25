@@ -1930,7 +1930,17 @@ with st.expander("Finalizar e Gerar Artes...", expanded=True):
                     st.session_state["pdf_buffer_pronto"] = gerar_pdf_planilha(
                         df_final)
 
-    if st.session_state.get("confirmacao_st") is not None:
+
+    if  st.session_state.get("pdf_buffer_pronto") is not None:
+        st.success("✅ PDF pronto para download!")
+        st.download_button(
+           label="📄 BAIXAR PDF INTERATIVO",
+           data=st.session_state["pdf_buffer_pronto"],
+           file_name=f"tabela_produtos_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+           mime="application/pdf",
+           type="primary",
+           use_container_width=True
+    )    
         st.markdown(
             "<div style='background-color:#fff1f2; border-left:4px solid #e11d48; padding:15px; margin-top:15px; margin-bottom:15px; border-radius:4px; box-shadow: 0px 4px 6px rgba(225, 29, 72, 0.1);'>"
             "<h4 style='color:#e11d48; margin-top:0;'>⚠️ Atenção: Imposto Não Aplicado</h4>"
