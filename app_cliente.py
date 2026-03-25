@@ -374,10 +374,10 @@ st.markdown("""
 
     .tabela-carrinho td {
         text-align: center;
-        padding: 6px 8px !important;
+        padding: 8px 10px !important;
         margin: 0px !important;
         border-bottom: 1px solid #e2e8f0;
-        height: 36px !important;
+        height: 52px !important;
         font-size: 12px !important;
         font-weight: 700;
         color: #1e293b;
@@ -394,8 +394,8 @@ st.markdown("""
     }
 
     .tabela-carrinho img {
-        height: 24px !important;
-        width: 24px !important;
+        height: 34px !important;
+        width: 34px !important;
         object-fit: contain !important;
         vertical-align: middle;
         display: block;
@@ -405,8 +405,8 @@ st.markdown("""
     div[data-testid="column"] button {
         padding: 0 !important;
         margin: 0px 0px 4px 0px !important;
-        min-height: 36px !important;
-        height: 36px !important;
+        min-height: 52px !important;
+        height: 52px !important;
         font-size: 13px !important;
         line-height: 1 !important;
         display: flex;
@@ -475,12 +475,12 @@ def renderizar_topo_destro():
                 <div>
                     <div class='destro-kicker'>Plataforma Comercial</div>
                     <h1 class='destro-title'>Catálogo de Pedidos DESTRO</h1>
-                    <p class='destro-subtitle'>Selecione produtos com agilidade, monte o carrinho do cliente e gere o PDF final com uma experiência visual mais profissional, limpa e moderna.</p>
+                    <p class='destro-subtitle'>Escolha seus produtos com facilidade, monte seu pedido em poucos cliques e baixe o PDF final para enviar com praticidade.</p>
                 </div>
                 <div class='destro-info-card'>
-                    <div class='destro-info-card-title'>Ambiente comercial</div>
-                    <strong>CRM de atendimento e pedido</strong>
-                    <div class='destro-mini-note'>Visual institucional, navegação clara e foco total na conversão do pedido sem alterar a lógica do sistema.</div>
+                    <div class='destro-info-card-title'>Atendimento rápido</div>
+                    <strong>Pedido simples e organizado</strong>
+                    <div class='destro-mini-note'>Navegue com facilidade, visualize melhor os produtos e finalize seu pedido de forma clara, rápida e segura.</div>
                 </div>
             </div>
         </div>
@@ -533,7 +533,6 @@ def imagem_para_base64(img_path):
         with open(img_path, "rb") as image_file:
             return base64.b64encode(image_file.read()).decode()
     return None
-
 # ==========================================
 # CARREGAMENTO DOS DADOS E SINÔNIMOS
 # ==========================================
@@ -872,7 +871,6 @@ st.markdown("<div class='destro-section-title'>Catálogo de Produtos</div>", uns
 # CAMPO DE BUSCA MANUAL
 # ==========================================
 st.markdown("<div class='destro-section-title'>Selecionar Produtos Manualmente</div>", unsafe_allow_html=True)
-
 if not df_filtrado.empty:
     df_filtrado['Opcao_Busca'] = df_filtrado.apply(
         lambda x: f"{x['Código']} - {mapear_sinonimos(x['Descrição'])}", axis=1)
@@ -1015,7 +1013,7 @@ if len(st.session_state['carrinho']) > 0:
         st.html(tabela_html)
 
     with c_btn:
-        st.markdown("<div style='height: 42px;'></div>", unsafe_allow_html=True)
+        st.markdown("<div style='height: 52px;'></div>", unsafe_allow_html=True)
 
         for cod in list(st.session_state['carrinho'].keys()):
             if st.button("🗑️", key=f"lista_rem_{cod}", help="Remover", use_container_width=True):
