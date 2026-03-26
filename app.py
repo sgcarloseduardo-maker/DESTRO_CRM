@@ -31,6 +31,9 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 APP_VERSION = "2026.03.26.01"
+MAX_UPLOAD_IMAGE_MB = 10
+MAX_UPLOAD_PDF_MB = 20
+ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 
 logger = logging.getLogger(__name__)
 if not logger.handlers:
@@ -108,6 +111,41 @@ if 'pdf_buffer_pronto' not in st.session_state:
     st.session_state['pdf_buffer_pronto'] = None
 
 
+def has_operation_permission(action: str) -> bool:
+    # Hook para futura camada de autorização.
+    _ = action
+    return True
+
+
+def validate_upload_basic(uploaded_file, allowed_exts, max_mb, label):
+    if uploaded_file is None:
+        return False, f"Nenhum arquivo enviado para {label}."
+
+    ext = os.path.splitext(uploaded_file.name)[1].lower()
+    if ext not in allowed_exts:
+        return False, f"Formato inválido para {label}. Use: {', '.join(sorted(allowed_exts))}."
+
+    size_bytes = getattr(uploaded_file, "size", None)
+    if size_bytes is not None and size_bytes > max_mb * 1024 * 1024:
+        return False, f"Arquivo muito grande para {label}. Limite: {max_mb} MB."
+
+    return True, ""
+
+
+def normalize_numeric_value(val, fallback=0.0, min_value=None, max_value=None):
+    try:
+        num = float(val)
+    except (TypeError, ValueError):
+        num = float(fallback)
+    if not np.isfinite(num):
+        num = float(fallback)
+    if min_value is not None:
+        num = max(min_value, num)
+    if max_value is not None:
+        num = min(max_value, num)
+    return num
+
+
 def processar_busca():
     item_escolhido = st.session_state.get("busca_temp")
     df_base = st.session_state.get("df_filtrado_atual", pd.DataFrame())
@@ -181,10 +219,10 @@ def atualizar_valores_uid(index=None, u_id=None):
         de_val = st.session_state.get(f"de_{u_id}", prod.get('DESC', 0.0))
         im_val = st.session_state.get(f"im_{u_id}", prod.get('Imposto', False))
 
-        prod['Preço Atual'] = float(pr_val if pr_val is not None else 0.0)
-        prod['Comissão'] = float(co_val if co_val is not None else 0.0)
-        prod['FLEX'] = float(fl_val if fl_val is not None else 0.0)
-        prod['DESC'] = float(de_val if de_val is not None else 0.0)
+        prod['Preço Atual'] = normalize_numeric_value(pr_val, fallback=0.0, min_value=0.0, max_value=999999.0)
+        prod['Comissão'] = normalize_numeric_value(co_val, fallback=0.0, min_value=-100.0, max_value=300.0)
+        prod['FLEX'] = normalize_numeric_value(fl_val, fallback=0.0, min_value=-100.0, max_value=300.0)
+        prod['DESC'] = normalize_numeric_value(de_val, fallback=0.0, min_value=0.0, max_value=100.0)
         prod['Imposto'] = bool(im_val)
 
         calc = prod['Preço Atual'] * (1 + (prod['Comissão'] / 100.0))
@@ -254,6 +292,22 @@ def obter_indice_imagens():
 
 def salvar_imagem_upload(uploaded_file, codigo_produto):
     if uploaded_file is not None:
+        if not has_operation_permission("upload_imagem"):
+            st.error("Você não tem permissão para atualizar imagens.")
+            return False
+
+        valid, msg = validate_upload_basic(
+            uploaded_file, ALLOWED_IMAGE_EXTENSIONS, MAX_UPLOAD_IMAGE_MB, "imagem"
+        )
+        if not valid:
+            st.error(msg)
+            return False
+
+        codigo_limpo = re.sub(r"\D", "", str(codigo_produto))
+        if not codigo_limpo:
+            st.error("Código de produto inválido para salvar imagem.")
+            return False
+
         # Define o caminho para a pasta Base de Imagens
         base_dir = os.path.dirname(os.path.abspath(__file__))
         pasta_imagens = os.path.join(base_dir, "Base de Imagens")
@@ -268,11 +322,16 @@ def salvar_imagem_upload(uploaded_file, codigo_produto):
 
         # Define o caminho do novo arquivo usando o código do produto
         caminho_salvar = os.path.join(
-            pasta_imagens, f"{codigo_produto}{extensao}")
+            pasta_imagens, f"{codigo_limpo}{extensao}")
 
         # Salva o arquivo fisicamente
-        with open(caminho_salvar, "wb") as f:
-            f.write(uploaded_file.getbuffer())
+        try:
+            with open(caminho_salvar, "wb") as f:
+                f.write(uploaded_file.getbuffer())
+        except OSError as exc:
+            logger.exception("Erro ao salvar imagem no disco: %s", exc)
+            st.error("Não foi possível salvar a imagem. Verifique permissões da pasta e tente novamente.")
+            return False
 
         # Limpa o cache para forçar a função obter_indice_imagens() a ler a nova imagem
         st.cache_data.clear()
@@ -685,7 +744,7 @@ def acionar_gerador_individual(df_produtos, fundo_path):
                 teste = (linha_atual + " " + p).strip()
                 try:
                     w = draw.textlength(teste, font=fonte_d)
-                except:
+                except Exception:
                     w = draw.textbbox((0, 0), teste, font=fonte_d)[2]
                 if w <= largura_max:
                     linha_atual = teste
@@ -705,7 +764,7 @@ def acionar_gerador_individual(df_produtos, fundo_path):
         for l in linhas[:3]:
             try:
                 w = draw.textlength(l, font=fonte_d)
-            except:
+            except Exception:
                 w = draw.textbbox((0, 0), l, font=fonte_d)[2]
             draw.text((cx_desc - w // 2, cur_y), l, fill="black", font=fonte_d)
             cur_y += tamanho_desc + 10
@@ -729,16 +788,16 @@ def acionar_gerador_individual(df_produtos, fundo_path):
 
             try:
                 w_int = draw.textlength(inteiro, font=fonte_p_int)
-            except:
+            except Exception:
                 w_int = draw.textbbox((0, 0), inteiro, font=fonte_p_int)[2]
             try:
                 w_cent = draw.textlength(centavo, font=fonte_p_cent)
-            except:
+            except Exception:
                 w_cent = draw.textbbox((0, 0), centavo, font=fonte_p_cent)[2]
             try:
                 bbox_int = draw.textbbox((0, 0), inteiro, font=fonte_p_int)
                 h_int = bbox_int[3] - bbox_int[1]
-            except:
+            except Exception:
                 h_int = tamanho_preco_int * 0.8
 
             if (w_int + w_cent) <= box_w and h_int <= box_h:
@@ -751,12 +810,12 @@ def acionar_gerador_individual(df_produtos, fundo_path):
 
         try:
             offset_y_int = draw.textbbox((0, 0), inteiro, font=fonte_p_int)[1]
-        except:
+        except Exception:
             offset_y_int = 0
         try:
             offset_y_cent = draw.textbbox(
                 (0, 0), centavo, font=fonte_p_cent)[1]
-        except:
+        except Exception:
             offset_y_cent = 0
 
         draw.text((start_x, cy_preco_top - offset_y_int),
@@ -1082,7 +1141,8 @@ def carregar_dados():
 
     if not os.path.exists(caminho_planilha):
         st.error(
-            f"🚨 PLANILHA NÃO ENCONTRADA: O sistema não achou '{caminho_planilha}'. Verifique o nome do arquivo no GitHub.")
+            "🚨 PLANILHA NÃO ENCONTRADA: o arquivo principal de dados não foi localizado no diretório do app.")
+        logger.error("Planilha principal ausente no caminho esperado: %s", caminho_planilha)
         return pd.DataFrame(), []
 
     # LÊ A ABA "Curva ABC_Semanal" OFICIAL DA PLANILHA
@@ -1398,10 +1458,17 @@ with st.sidebar:
         if st.button("Processar Pedido", use_container_width=True, type="primary"):
             try:
                 import pdfplumber
+                valid_pdf, msg_pdf = validate_upload_basic(
+                    pdf_pedido, {".pdf"}, MAX_UPLOAD_PDF_MB, "PDF de pedido"
+                )
+                if not valid_pdf:
+                    st.error(msg_pdf)
+                    st.stop()
+
                 with pdfplumber.open(pdf_pedido) as pdf:
                     texto_pdf = ""
                     for page in pdf.pages:
-                        texto_pdf += page.extract_text() + "\n"
+                        texto_pdf += (page.extract_text() or "") + "\n"
 
                 codigos_encontrados = []
                 # Procura no texto do PDF por linhas que começam com o código (ex: 71718-3)
@@ -1942,6 +2009,9 @@ with st.expander("Finalizar e Gerar Artes...", expanded=True):
 
     with btn1:
         if st.button("GERAR TABLOIDE (GRADE)", type="primary", use_container_width=True):
+            if not has_operation_permission("gerar_tabloide"):
+                st.error("Você não tem permissão para gerar tabloides.")
+                st.stop()
             if n_layout == 0:
                 st.error(
                     "Para gerar um tabloide em grade, escolha um layout fixo (9, 12, 16 ou 20) no menu lateral.")
@@ -1979,6 +2049,9 @@ with st.expander("Finalizar e Gerar Artes...", expanded=True):
 
     with btn2:
         if st.button("GERAR ARTES INDIVIDUAIS", type="secondary", use_container_width=True):
+            if not has_operation_permission("gerar_artes_individuais"):
+                st.error("Você não tem permissão para gerar artes individuais.")
+                st.stop()
             fpath_indiv = obter_template_individual(base_dir, num_versao_indiv)
             st.session_state["pdf_buffer_pronto"] = None
 
@@ -2002,6 +2075,9 @@ with st.expander("Finalizar e Gerar Artes...", expanded=True):
 
     with btn3:
         if st.button("GERAR PDF PLANILHA", type="secondary", use_container_width=True):
+            if not has_operation_permission("gerar_pdf"):
+                st.error("Você não tem permissão para gerar PDF.")
+                st.stop()
             st.session_state["pdf_buffer_pronto"] = None
 
             df_final = pd.DataFrame(st.session_state["produtos_selecionados"])
@@ -2070,62 +2146,62 @@ with st.expander("Finalizar e Gerar Artes...", expanded=True):
         )
     # --- FIM DO BLOCO DE DOWNLOAD DO PDF ---
 
+    st.markdown(
+        "<hr style='margin: 15px 0;'><p class='subtitulo' style='text-align:center;'>🖼️ Escolha os Layouts</p>", unsafe_allow_html=True)
+    c_prev1, c_prev2, c_prev3 = st.columns(3)
+
+    with c_prev1:
+        texto_layout = "Sem Limite Definido" if n_layout == 0 else f"{n_layout} Espaços"
         st.markdown(
-            "<hr style='margin: 15px 0;'><p class='subtitulo' style='text-align:center;'>🖼️ Escolha os Layouts</p>", unsafe_allow_html=True)
-        c_prev1, c_prev2, c_prev3 = st.columns(3)
+            f"<div style='text-align:center; font-weight:bold; color:#1E293B; margin-bottom:8px;'>Layout do Tabloide ({texto_layout})</div>", unsafe_allow_html=True)
+        st.selectbox("Versão Tabloide", [
+                     "Layout 1", "Layout 2", "Layout 3", "Layout 4"], key="sel_grade", label_visibility="collapsed")
 
-        with c_prev1:
-            texto_layout = "Sem Limite Definido" if n_layout == 0 else f"{n_layout} Espaços"
-            st.markdown(
-                f"<div style='text-align:center; font-weight:bold; color:#1E293B; margin-bottom:8px;'>Layout do Tabloide ({texto_layout})</div>", unsafe_allow_html=True)
-            st.selectbox("Versão Tabloide", [
-                         "Layout 1", "Layout 2", "Layout 3", "Layout 4"], key="sel_grade", label_visibility="collapsed")
+        opt_g = st.session_state.get("sel_grade", "Layout 1")
+        num_v_g = opt_g.split()[-1]
 
-            opt_g = st.session_state.get("sel_grade", "Layout 1")
-            num_v_g = opt_g.split()[-1]
-
-            if n_layout != 0:
-                if n_layout == 9:
-                    nome_fundo_grade = f"FUNDO-BASE-USADO-NA-AUTOMACAO-{num_v_g}.jpg"
-                else:
-                    nome_fundo_grade = f"Modelo {n_layout} Espaços-{num_v_g}.jpg"
-                f_path_g = os.path.join(base_dir, nome_fundo_grade)
-                if os.path.exists(f_path_g):
-                    st.image(f_path_g, use_container_width=True)
-                else:
-                    st.warning(
-                        f"⚠️ Imagem '{nome_fundo_grade}' não encontrada.")
+        if n_layout != 0:
+            if n_layout == 9:
+                nome_fundo_grade = f"FUNDO-BASE-USADO-NA-AUTOMACAO-{num_v_g}.jpg"
             else:
-                st.info("⚠️ Sem limite não gera tabloide em grade.")
-
-        with c_prev2:
-            st.markdown(
-                "<div style='text-align:center; font-weight:bold; color:#1E293B; margin-bottom:8px;'>Arte Individual</div>", unsafe_allow_html=True)
-            st.selectbox("Versão Individual", [
-                         "Layout 1", "Layout 2", "Layout 3", "Layout 4"], key="sel_indiv", label_visibility="collapsed")
-
-            opt_i = st.session_state.get("sel_indiv", "Layout 1")
-            num_v_i = opt_i.split()[-1]
-            f_path_i = obter_template_individual(base_dir, num_v_i)
-
-            if os.path.exists(f_path_i):
-                st.image(f_path_i, use_container_width=True)
+                nome_fundo_grade = f"Modelo {n_layout} Espaços-{num_v_g}.jpg"
+            f_path_g = os.path.join(base_dir, nome_fundo_grade)
+            if os.path.exists(f_path_g):
+                st.image(f_path_g, use_container_width=True)
             else:
                 st.warning(
-                    f"⚠️ Imagem do layout individual {num_v_i} não encontrada.")
+                    f"⚠️ Imagem '{nome_fundo_grade}' não encontrada.")
+        else:
+            st.info("⚠️ Sem limite não gera tabloide em grade.")
 
-        with c_prev3:
-            st.markdown("""
-            <div style='text-align:center; font-weight:bold; color:#1E293B; margin-bottom:8px;'>
-                PDF Planilha
-            </div>
-            <div style='background-color: #ecfeff; border: 2px dashed #06b6d4; border-radius: 8px; height: 180px;
-                        display: flex; align-items: center; justify-content: center; flex-direction: column;'>
-                <span style='font-size: 40px;'>📄</span>
-                <span style='color: #0f172a; font-weight: bold; margin-top: 10px;'>PDF Interativo</span>
-                <span style='color: #475569; font-size: 12px; margin-top: 6px;'>Com checkboxes e quantidade</span>
-            </div>
-            """, unsafe_allow_html=True)
+    with c_prev2:
+        st.markdown(
+            "<div style='text-align:center; font-weight:bold; color:#1E293B; margin-bottom:8px;'>Arte Individual</div>", unsafe_allow_html=True)
+        st.selectbox("Versão Individual", [
+                     "Layout 1", "Layout 2", "Layout 3", "Layout 4"], key="sel_indiv", label_visibility="collapsed")
+
+        opt_i = st.session_state.get("sel_indiv", "Layout 1")
+        num_v_i = opt_i.split()[-1]
+        f_path_i = obter_template_individual(base_dir, num_v_i)
+
+        if os.path.exists(f_path_i):
+            st.image(f_path_i, use_container_width=True)
+        else:
+            st.warning(
+                f"⚠️ Imagem do layout individual {num_v_i} não encontrada.")
+
+    with c_prev3:
+        st.markdown("""
+        <div style='text-align:center; font-weight:bold; color:#1E293B; margin-bottom:8px;'>
+            PDF Planilha
+        </div>
+        <div style='background-color: #ecfeff; border: 2px dashed #06b6d4; border-radius: 8px; height: 180px;
+                    display: flex; align-items: center; justify-content: center; flex-direction: column;'>
+            <span style='font-size: 40px;'>📄</span>
+            <span style='color: #0f172a; font-weight: bold; margin-top: 10px;'>PDF Interativo</span>
+            <span style='color: #475569; font-size: 12px; margin-top: 6px;'>Com checkboxes e quantidade</span>
+        </div>
+        """, unsafe_allow_html=True)
 
     if len(st.session_state.get('galeria_individuais', [])) > 0:
         st.markdown(
@@ -2134,9 +2210,13 @@ with st.expander("Finalizar e Gerar Artes...", expanded=True):
         for index, item in enumerate(st.session_state['galeria_individuais']):
             with colunas[index % 3]:
                 st.image(item["path"], use_container_width=True)
-                with open(item["path"], "rb") as file:
-                    st.download_button(label="⬇️ Baixar Imagem", data=file,
-                                       file_name=item["nome"], mime="image/jpeg", key=f"dl_btn_galeria_{item['nome']}", use_container_width=True)
+                try:
+                    with open(item["path"], "rb") as file:
+                        st.download_button(label="⬇️ Baixar Imagem", data=file,
+                                           file_name=item["nome"], mime="image/jpeg", key=f"dl_btn_galeria_{item['nome']}", use_container_width=True)
+                except OSError as exc:
+                    logger.exception("Falha ao abrir arte para download (%s): %s", item.get("path"), exc)
+                    st.error("Não foi possível disponibilizar essa imagem para download.")
 
 with tab2:
     st.header("🤖 Decifrador de Sistema")
