@@ -28,6 +28,22 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+APP_VERSION = "2026.03.26.01"
+
+def forcar_refresh_app(limpar_sessao=True):
+    st.cache_data.clear()
+    st.cache_resource.clear()
+
+    if limpar_sessao:
+        for chave in list(st.session_state.keys()):
+            if chave != "_app_version":
+                del st.session_state[chave]
+
+    st.session_state["_app_version"] = APP_VERSION
+
+if st.session_state.get("_app_version") != APP_VERSION:
+    forcar_refresh_app(limpar_sessao=True)
+    st.rerun()
 
 # ==========================================
 # CSS CUSTOMIZADO
@@ -207,7 +223,7 @@ def normalizar_codigo_imagem(codigo: str) -> str:
     return re.sub(r"\D", "", s)
 
 
-@st.cache_data
+@st.cache_data(show_spinner=False, ttl=300)
 def obter_indice_imagens():
     base_dir = os.path.dirname(os.path.abspath(__file__))
     pasta_imagens = os.path.join(base_dir, "Base de Imagens")
@@ -1028,7 +1044,7 @@ def manter_categoria_completa(txt):
     return s
 
 
-@st.cache_data
+@st.cache_data(show_spinner=False, ttl=300)
 def carregar_dados():
     base_dir = os.path.dirname(os.path.abspath(__file__))
     caminho_planilha = os.path.join(base_dir, "Programa_Destro-04-03.xlsx")
@@ -1314,6 +1330,11 @@ def atualizar_prazo():
 # ==========================================
 with st.sidebar:
     st.image("https://cdn-icons-png.flaticon.com/512/3144/3144456.png", width=60)
+    st.caption(f"Versão do app: {APP_VERSION}")
+
+    if st.button("🔄 Forçar atualização completa", use_container_width=True):
+        forcar_refresh_app(limpar_sessao=True)
+        st.rerun()
 
     # ==========================================
     # 1. NOVO CAMPO: PEDIDO CLIENTE (UPLOAD PDF)
@@ -1404,18 +1425,24 @@ with st.sidebar:
 
     opcoes_layout = {0: "Sem Limite", 9: "9 Espaços", 12: "12 Espaços",
                      16: "16 Espaços", 20: "20 Espaços"}
+    if "layout_selector_dinamico" not in st.session_state:
+        st.session_state["layout_selector_dinamico"] = st.session_state.get("num_produtos_layout", 0)
+
     layout_selecionado = st.segmented_control(
-        "Escolha o formato:", options=list(opcoes_layout.keys()),
-        format_func=lambda x: opcoes_layout[x], selection_mode="single",
-        default=st.session_state.get('num_produtos_layout', 0),
-        key=f"layout_selector_dinamico_{st.session_state.get('num_produtos_layout', 0)}"
+        "Escolha o formato:",
+        options=list(opcoes_layout.keys()),
+        format_func=lambda x: opcoes_layout[x],
+        selection_mode="single",
+        default=st.session_state.get("num_produtos_layout", 0),
+        key="layout_selector_dinamico"
     )
 
-    if layout_selecionado is not None and layout_selecionado != st.session_state['num_produtos_layout']:
-        st.session_state['num_produtos_layout'] = layout_selecionado
+    if layout_selecionado is None:
+        layout_selecionado = st.session_state.get("num_produtos_layout", 0)
 
-    num_produtos = st.session_state['num_produtos_layout']
-    st.divider()
+    if layout_selecionado != st.session_state.get("num_produtos_layout", 0):
+        st.session_state["num_produtos_layout"] = layout_selecionado
+        st.rerun()
 
     # ==========================================
     # 2. NOVA LINHA: DATA DA ÚLTIMA ATUALIZAÇÃO DA BASE
