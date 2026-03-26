@@ -34,6 +34,7 @@ APP_VERSION = "2026.03.26.01"
 MAX_UPLOAD_IMAGE_MB = 10
 MAX_UPLOAD_PDF_MB = 20
 ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
+CACHE_TTL_SECONDS = 300
 
 logger = logging.getLogger(__name__)
 if not logger.handlers:
@@ -272,7 +273,7 @@ def normalizar_codigo_imagem(codigo: str) -> str:
     return re.sub(r"\D", "", s)
 
 
-@st.cache_data
+@st.cache_data(ttl=CACHE_TTL_SECONDS, show_spinner=False)
 def obter_indice_imagens():
     base_dir = os.path.dirname(os.path.abspath(__file__))
     pasta_imagens = os.path.join(base_dir, "Base de Imagens")
@@ -339,11 +340,19 @@ def salvar_imagem_upload(uploaded_file, codigo_produto):
     return False
 
 
+@st.cache_data(ttl=CACHE_TTL_SECONDS, show_spinner=False)
+def image_to_base64_cached(img_path, mtime):
+    _ = mtime
+    if img_path and os.path.exists(img_path):
+        with open(img_path, "rb") as image_file:
+            return base64.b64encode(image_file.read()).decode('utf-8')
+    return ""
+
+
 def image_to_base64(img_path):
     if img_path and os.path.exists(img_path):
         try:
-            with open(img_path, "rb") as image_file:
-                return base64.b64encode(image_file.read()).decode('utf-8')
+            return image_to_base64_cached(img_path, os.path.getmtime(img_path))
         except OSError as exc:
             logger.warning("Falha ao converter imagem para base64 (%s): %s", img_path, exc)
     return ""
@@ -587,6 +596,25 @@ def colar_imagem_grade(bg, img_path, x_ini, x_fim, y_ini, y_fim, fator_x, fator_
         logger.warning("Falha ao colar imagem no layout (%s): %s", img_path, exc)
         desenhar_placeholder(bg, x1, y1, x2, y2)
         return False
+
+
+@st.cache_data(ttl=CACHE_TTL_SECONDS, show_spinner=False)
+def gerar_thumb_pdf_bytes(img_path, mtime, max_img_w=65, max_img_h=56):
+    _ = mtime
+    img_temp = Image.open(img_path).convert("RGBA")
+    img_temp = remover_fundo_branco(img_temp)
+    bbox = img_temp.getbbox()
+    if bbox:
+        img_temp = img_temp.crop(bbox)
+
+    img_w, img_h = img_temp.size
+    ratio = min(max_img_w / img_w, max_img_h / img_h)
+    new_w, new_h = int(img_w * ratio), int(img_h * ratio)
+    img_temp = img_temp.resize((new_w, new_h), Image.Resampling.LANCZOS)
+
+    temp_img_buffer = BytesIO()
+    img_temp.save(temp_img_buffer, format="PNG")
+    return temp_img_buffer.getvalue(), new_w, new_h
 
 
 def acionar_gerador_grade(df_produtos, fundo_path, n_layout):
@@ -955,25 +983,10 @@ def gerar_pdf_planilha(df_produtos):
         img_path = img_idx.get(codigo)
         if img_path and os.path.exists(img_path):
             try:
-                img_temp = Image.open(img_path).convert("RGBA")
-                img_temp = remover_fundo_branco(img_temp)
-                bbox = img_temp.getbbox()
-                if bbox:
-                    img_temp = img_temp.crop(bbox)
-
-                max_img_w = 65
-                max_img_h = 56
-                img_w, img_h = img_temp.size
-                ratio = min(max_img_w / img_w, max_img_h / img_h)
-                new_w, new_h = int(img_w * ratio), int(img_h * ratio)
-                img_temp = img_temp.resize(
-                    (new_w, new_h), Image.Resampling.LANCZOS)
-
-                temp_img_buffer = BytesIO()
-                img_temp.save(temp_img_buffer, format="PNG")
-                temp_img_buffer.seek(0)
-
-                img_reader = ImageReader(temp_img_buffer)
+                thumb_bytes, new_w, new_h = gerar_thumb_pdf_bytes(
+                    img_path, os.path.getmtime(img_path), max_img_w=65, max_img_h=56
+                )
+                img_reader = ImageReader(BytesIO(thumb_bytes))
                 img_x = x_foto + (col_foto - new_w) / 2
                 img_y = y_bottom + (row_h - new_h) / 2
                 c.drawImage(img_reader, img_x, img_y, width=new_w,
@@ -1134,7 +1147,7 @@ def deterministic_fator_anterior(key: str) -> float:
     return 0.95
 
 
-@st.cache_data
+@st.cache_data(ttl=CACHE_TTL_SECONDS, show_spinner=False)
 def carregar_dados():
     base_dir = os.path.dirname(os.path.abspath(__file__))
     caminho_planilha = os.path.join(base_dir, "Programa_Destro-04-03.xlsx")
@@ -1518,8 +1531,6 @@ with st.sidebar:
                     if adicionados_ped > 0:
                         st.success(
                             f"✅ {adicionados_ped} produto(s) adicionados ao painel!")
-                        time.sleep(1.5)
-                        st.rerun()
                 else:
                     st.warning("Nenhum código reconhecido no PDF.")
 
@@ -1561,7 +1572,6 @@ with st.sidebar:
 
     if layout_selecionado != st.session_state.get("num_produtos_layout", 0):
         st.session_state["num_produtos_layout"] = layout_selecionado
-        st.rerun()
 
     # ==========================================
     # 2. NOVA LINHA: DATA DA ÚLTIMA ATUALIZAÇÃO DA BASE
@@ -1720,7 +1730,6 @@ with tab1:
                 'Desconto %', ascending=False), 3)
             add_auto_products(df_app[df_app['Meta_Mensal'] == True].sort_values(
                 'Desconto %', ascending=False), 4)
-            st.rerun()
 
     with cg2:
         if st.button("💥 BATEU LEVOU (20 Itens)", use_container_width=True):
@@ -1728,7 +1737,6 @@ with tab1:
             st.session_state['num_produtos_layout'] = 20
             add_auto_products(df_app[df_app['Camp_Bateu'] == True].sort_values(
                 'Desconto %', ascending=False), 20)
-            st.rerun()
 
     with cg3:
         if st.button("🎯 META MENSAL - PRO (20 Itens)", use_container_width=True):
@@ -1736,7 +1744,6 @@ with tab1:
             st.session_state['num_produtos_layout'] = 20
             add_auto_products(df_app[df_app['Meta_Mensal'] == True].sort_values(
                 'Desconto %', ascending=False), 20)
-            st.rerun()
 
     with cg4:
         if st.button("📈 CURVA ABC", use_container_width=True):
@@ -1764,7 +1771,6 @@ with tab1:
             if faltantes:
                 st.warning(
                     f"⚠️ {len(faltantes)} produto(s) da Curva ABC não foram encontrados na aba Banco_Dados_Semanal.")
-            st.rerun()
 
     st.markdown("---")
     st.markdown("<p class='titulo-secao'>Selecionar Produtos Manualmente</p>",
@@ -1795,7 +1801,6 @@ with tab1:
         if st.button("🗑️ Esvaziar Tudo", use_container_width=True):
             st.session_state['produtos_selecionados'], st.session_state['galeria_individuais'], st.session_state['confirmacao_st'] = [
             ], [], None
-            st.rerun()
     with col_atualizar:
         if st.button("🔄 Atualizar App", use_container_width=True):
             st.cache_data.clear()
@@ -1827,6 +1832,17 @@ with tab1:
         st.markdown("---")
 
         img_idx_global = obter_indice_imagens()
+        st.markdown("""
+            <style>
+            div[data-testid="stPopover"] > button {
+                padding: 0 !important;
+                font-size: 10px !important;
+                height: 24px !important;
+                min-height: 24px !important;
+                margin-top: -10px !important;
+            }
+            </style>
+        """, unsafe_allow_html=True)
 
     for i, prod in enumerate(st.session_state.produtos_selecionados):
         uid = prod['Código']
@@ -1863,28 +1879,12 @@ with tab1:
             with b2:
                 if st.button("⬆️", key=f"up_{uid}", type="tertiary"):
                     mover_cima(i)
-                    st.rerun()
             with b3:
                 if st.button("⬇️", key=f"dw_{uid}", type="tertiary"):
                     mover_baixo(i)
-                    st.rerun()
             with b4:
                 if st.button("❌", key=f"del_{uid}", type="tertiary"):
                     deletar_item(i)
-                    st.rerun()
-
-            # CSS para encolher o popover e não alargar muito a coluna
-            st.markdown("""
-                <style>
-                div[data-testid="stPopover"] > button {
-                    padding: 0 !important;
-                    font-size: 10px !important;
-                    height: 24px !important;
-                    min-height: 24px !important;
-                    margin-top: -10px !important;
-                }
-                </style>
-            """, unsafe_allow_html=True)
 
             # Segunda linha de ações (Trocar/Subir imagem)
             if caminho_img and os.path.exists(caminho_img):
@@ -1893,14 +1893,12 @@ with tab1:
                                                 'png', 'jpg', 'jpeg', 'webp'], key=f"up_trocar_{uid}", label_visibility="collapsed")
                     if nova_img and st.button("Salvar Troca", key=f"btn_trocar_{uid}", type="primary"):
                         salvar_imagem_upload(nova_img, cod)
-                        st.rerun()
             else:
                 with st.popover("📤 Subir", use_container_width=True):
                     nova_img = st.file_uploader("", type=[
                                                 'png', 'jpg', 'jpeg', 'webp'], key=f"up_novo_{uid}", label_visibility="collapsed")
                     if nova_img and st.button("Salvar Imagem", key=f"btn_novo_{uid}", type="primary"):
                         salvar_imagem_upload(nova_img, cod)
-                        st.rerun()
 
         with c_st:
             st.write(prod['Status'])
@@ -2045,7 +2043,8 @@ with st.expander("Finalizar e Gerar Artes...", expanded=True):
                         st.session_state["path_pendente"] = fpath_grade
                     else:
                         st.session_state["confirmacao_st"] = None
-                        acionar_gerador_grade(df_final, fpath_grade, n_layout)
+                        with st.spinner("Gerando tabloide em alta resolução..."):
+                            acionar_gerador_grade(df_final, fpath_grade, n_layout)
 
     with btn2:
         if st.button("GERAR ARTES INDIVIDUAIS", type="secondary", use_container_width=True):
@@ -2070,8 +2069,9 @@ with st.expander("Finalizar e Gerar Artes...", expanded=True):
                     st.session_state["path_pendente"] = fpath_indiv
                 else:
                     st.session_state["confirmacao_st"] = None
-                    st.session_state["galeria_individuais"] = acionar_gerador_individual(
-                        df_final, fpath_indiv)
+                    with st.spinner("Gerando artes individuais..."):
+                        st.session_state["galeria_individuais"] = acionar_gerador_individual(
+                            df_final, fpath_indiv)
 
     with btn3:
         if st.button("GERAR PDF PLANILHA", type="secondary", use_container_width=True):
@@ -2094,8 +2094,9 @@ with st.expander("Finalizar e Gerar Artes...", expanded=True):
                     st.session_state["df_pendente"] = df_final
                 else:
                     st.session_state["confirmacao_st"] = None
-                    st.session_state["pdf_buffer_pronto"] = gerar_pdf_planilha(
-                        df_final)
+                    with st.spinner("Gerando PDF da planilha..."):
+                        st.session_state["pdf_buffer_pronto"] = gerar_pdf_planilha(
+                            df_final)
 
     if st.session_state.get("confirmacao_st") is not None:
         st.markdown(
@@ -2118,14 +2119,17 @@ with st.expander("Finalizar e Gerar Artes...", expanded=True):
                 st.session_state["confirmacao_st"] = None
 
                 if acao == "grade":
-                    acionar_gerador_grade(
-                        df_p, path_p, st.session_state.get("num_produtos_layout", 9))
+                    with st.spinner("Gerando tabloide em alta resolução..."):
+                        acionar_gerador_grade(
+                            df_p, path_p, st.session_state.get("num_produtos_layout", 9))
                 elif acao == "indiv":
-                    st.session_state["galeria_individuais"] = acionar_gerador_individual(
-                        df_p, path_p)
+                    with st.spinner("Gerando artes individuais..."):
+                        st.session_state["galeria_individuais"] = acionar_gerador_individual(
+                            df_p, path_p)
                 elif acao == "pdf":
-                    st.session_state["pdf_buffer_pronto"] = gerar_pdf_planilha(
-                        df_p)
+                    with st.spinner("Gerando PDF da planilha..."):
+                        st.session_state["pdf_buffer_pronto"] = gerar_pdf_planilha(
+                            df_p)
 
         with c_nao:
             if st.button("❌ NÃO, CANCELAR E ARRUMAR", type="secondary", use_container_width=True):
