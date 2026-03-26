@@ -9,6 +9,7 @@ import base64
 import urllib.parse
 from datetime import datetime
 from PIL import Image, ImageDraw, ImageFont
+
 from reportlab.lib.pagesizes import letter, landscape
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Spacer, Image as RLImage
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -131,8 +132,6 @@ if 'sel_grade' not in st.session_state:
 if 'sel_indiv' not in st.session_state:
     st.session_state['sel_indiv'] = None
 
-
-
 def processar_busca():
     item_escolhido = st.session_state.get("busca_temp")
     df_base = st.session_state.get("df_filtrado_atual", pd.DataFrame())
@@ -175,6 +174,115 @@ def processar_busca():
     st.session_state["busca_temp"] = None
 
 
+def mover_cima(index):
+    if index > 0:
+        lista = st.session_state['produtos_selecionados']
+        lista[index], lista[index-1] = lista[index-1], lista[index]
+
+
+def mover_baixo(index):
+    lista = st.session_state['produtos_selecionados']
+    if index < len(lista) - 1:
+        lista[index], lista[index+1] = lista[index+1], lista[index]
+
+
+def deletar_item(index):
+    st.session_state['produtos_selecionados'].pop(index)
+
+
+def atualizar_valores_uid(index=None, u_id=None):
+    if index is None and u_id is not None:
+        index = next((idx for idx, p in enumerate(
+            st.session_state['produtos_selecionados']) if p['Código'] == u_id), None)
+
+    if index is not None:
+        prod = st.session_state['produtos_selecionados'][index]
+        pr_val = st.session_state.get(
+            f"pr_{u_id}", prod.get('Preço Atual', 0.0))
+        co_val = st.session_state.get(f"co_{u_id}", prod.get('Comissão', 0.0))
+        fl_val = st.session_state.get(f"fl_{u_id}", prod.get('FLEX', 0.0))
+        de_val = st.session_state.get(f"de_{u_id}", prod.get('DESC', 0.0))
+        im_val = st.session_state.get(f"im_{u_id}", prod.get('Imposto', False))
+
+        prod['Preço Atual'] = float(pr_val if pr_val is not None else 0.0)
+        prod['Comissão'] = float(co_val if co_val is not None else 0.0)
+        prod['FLEX'] = float(fl_val if fl_val is not None else 0.0)
+        prod['DESC'] = float(de_val if de_val is not None else 0.0)
+        prod['Imposto'] = bool(im_val)
+
+        calc = prod['Preço Atual'] * (1 + (prod['Comissão'] / 100.0))
+        calc = calc * (1 + (prod['FLEX'] / 100.0))
+        calc = calc * (1 - (prod['DESC'] / 100.0))
+        if prod['Imposto']:
+            calc = calc * 1.101
+
+        prod['Preço Final'] = round(calc, 2)
+
+
+def step_value(u_id, prefix, delta):
+    key = f"{prefix}_{u_id}"
+    current_val = st.session_state.get(key, 0.0)
+    st.session_state[key] = round(
+        (current_val if current_val is not None else 0.0) + delta, 1)
+    atualizar_valores_uid(u_id=u_id)
+
+
+def checar_imposto_st(df):
+    alertas = []
+    for _, row in df.iterrows():
+        if str(row.get('ST_Flag', '')).strip() == '*' and not bool(row.get('Imposto', False)):
+            alertas.append(row['Descrição'])
+    return alertas
+
+
+def add_auto_products(df_subset, max_items):
+    added = 0
+    for _, row in df_subset.iterrows():
+        if max_items > 0 and added >= max_items:
+            break
+        cod = row['Código']
+        if not any(d['Código'] == cod for d in st.session_state['produtos_selecionados']):
+            st.session_state['produtos_selecionados'].append({
+                'Levar': True,
+                'Código': cod,
+                'Status': row['Status'],
+                'Descrição': row['Descrição'],
+                'Preço Atual': float(row['Preço Atual']),
+                'Comissão': 0.0,
+                'FLEX': 0.0,
+                'DESC': 0.0,
+                'Imposto': False,
+                'Preço Final': float(row['Preço Atual']),
+                'ST_Flag': row.get('ST_Flag', '')
+            })
+            added += 1
+
+
+def normalizar_codigo_imagem(codigo: str) -> str:
+    if not codigo:
+        return ""
+    s = str(codigo).split("-")[0]
+    return re.sub(r"\D", "", s)
+
+
+@st.cache_data
+def obter_indice_imagens():
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    pasta_imagens = os.path.join(base_dir, "Base de Imagens")
+    idx = {}
+    if not os.path.exists(pasta_imagens):
+        return idx
+    for root, _, files in os.walk(pasta_imagens):
+        for fn in files:
+            ext = os.path.splitext(fn)[1].lower()
+            if ext in (".jpg", ".jpeg", ".png", ".webp"):
+                base = os.path.splitext(fn)[0]
+                num = re.sub(r"\D", "", base)
+                if num:
+                    idx[num] = os.path.join(root, fn)
+    return idx
+
+
 def salvar_imagem_upload(uploaded_file, codigo_produto):
     if uploaded_file is None:
         return False
@@ -202,7 +310,6 @@ def salvar_imagem_upload(uploaded_file, codigo_produto):
 
     st.cache_data.clear()
     return True
-
 
 
 def image_to_base64(img_path):
@@ -235,8 +342,6 @@ def carregar_fonte(caminho, tamanho):
     except Exception:
         pass
     return ImageFont.load_default()
-
-
 def obter_template_individual(base_dir, versao):
     candidatos = [
         os.path.join(base_dir, f"Modelo_arte_individual-{versao}.jpg"),
@@ -247,12 +352,10 @@ def obter_template_individual(base_dir, versao):
             return caminho
     return candidatos[0]
 
-
 def extrair_numero_layout(nome_arquivo: str) -> int:
     nome_base = os.path.basename(nome_arquivo)
     match = re.search(r'(\d+)(?=\.(jpg|jpeg|png|webp)$)', nome_base, re.IGNORECASE)
     return int(match.group(1)) if match else 1
-
 
 def listar_layouts_grade(base_dir, n_layout):
     if n_layout == 0:
@@ -274,7 +377,6 @@ def listar_layouts_grade(base_dir, n_layout):
         for arq in arquivos
     ]
 
-
 def listar_layouts_individuais(base_dir):
     arquivos = glob.glob(os.path.join(base_dir, "Modelo_arte_individual-*.jpg"))
     arquivos += glob.glob(os.path.join(base_dir, "Modelo_arte_individual_*.jpg"))
@@ -288,7 +390,6 @@ def listar_layouts_individuais(base_dir):
         }
         for arq in arquivos
     ]
-
 
 def obter_layout_selecionado(layouts, session_key):
     if not layouts:
@@ -305,7 +406,6 @@ def obter_layout_selecionado(layouts, session_key):
 
     st.session_state[session_key] = layouts[0]["label"]
     return layouts[0]
-
 
 def renderizar_seletor_layouts(titulo, layouts, session_key, colunas_por_linha=3):
     st.markdown(f"#### {titulo}")
@@ -344,7 +444,6 @@ def renderizar_seletor_layouts(titulo, layouts, session_key, colunas_por_linha=3
                 st.rerun()
 
 
-
 def desenhar_placeholder(bg_img, x1, y1, x2, y2):
     draw = ImageDraw.Draw(bg_img)
     draw.rectangle([x1, y1, x2, y2], outline="red",
@@ -367,11 +466,10 @@ def desenhar_placeholder(bg_img, x1, y1, x2, y2):
         w, h = 150, 60
 
     pad = 10
-    draw.rectangle([cx - w//2 - pad, cy - h//2 - pad, cx + w//2 +
-                   pad, cy + h//2 + pad], fill="white", outline="red", width=2)
+    draw.rectangle([cx - w//2 - pad, cy - h//2 - pad, cx + w//2 + pad,
+                   cy + h//2 + pad], fill="white", outline="red", width=2)
     draw.multiline_text((cx - w//2, cy - h//2), texto,
                         fill="red", font=fonte, align="center")
-
 
 # ==========================================
 # MOTOR DINÂMICO DE ENCARTES (DPI INTELIGENTE)
@@ -443,6 +541,7 @@ def desenhar_texto_box_grade(draw, texto, x_ini, x_fim, y_ini, y_fim, fonte_path
                 w = draw.textlength(teste, font=fonte)
             except:
                 w = draw.textbbox((0, 0), teste, font=fonte)[2]
+
             if w <= largura:
                 linha_atual = teste
             else:
@@ -461,6 +560,7 @@ def desenhar_texto_box_grade(draw, texto, x_ini, x_fim, y_ini, y_fim, fonte_path
         total_h = len(linhas[:3]) * (h_line + 4)
         if len(linhas) <= 3 and total_h <= altura:
             break
+
         tamanho -= 2
         fonte = carregar_fonte(fonte_path, tamanho)
 
@@ -483,8 +583,8 @@ def desenhar_texto_box_grade(draw, texto, x_ini, x_fim, y_ini, y_fim, fonte_path
             offset_y = draw.textbbox((0, 0), l, font=fonte)[1]
         except:
             offset_y = 0
-
-        draw.text((cx - w // 2, cur_y - offset_y), l, fill="black", font=fonte)
+        draw.text((cx - w // 2, cur_y - offset_y),
+                  l, fill="black", font=fonte)
         cur_y += h_line + 4
 
 
@@ -496,10 +596,10 @@ def desenhar_preco_box_grade(draw, preco, x_ini, x_fim, y_ini, y_fim, fonte_path
 
     texto = f"R$ {float(preco):,.2f}".replace(
         ",", "X").replace(".", ",").replace("X", ".")
-
     tamanho = max(15, int(h_box * 0.85))
     if tamanho > 150:
         tamanho = 150
+
     fonte = carregar_fonte(fonte_path, tamanho)
 
     while tamanho > 12:
@@ -553,6 +653,7 @@ def colar_imagem_grade(bg, img_path, x_ini, x_fim, y_ini, y_fim, fator_x, fator_
 
 def acionar_gerador_grade(df_produtos, fundo_path, n_layout):
     st.toast("🎨 Gerando Tabloide com Resolução Inteligente...", icon="⏳")
+
     if len(df_produtos) != n_layout:
         st.error(
             f"❌ O template atual precisa de exatamente {n_layout} produtos. Você selecionou {len(df_produtos)}.")
@@ -592,6 +693,7 @@ def acionar_gerador_grade(df_produtos, fundo_path, n_layout):
         codigo = normalizar_codigo_imagem(row.get("Código", ""))
         desc = str(row.get("Descrição", "")).strip()
         preco = row.get("Preço Final", row.get("Preço Atual", 0.0))
+
         c, l = i % cols_count, i // cols_count
 
         img_path = img_idx.get(codigo)
@@ -611,12 +713,12 @@ def acionar_gerador_grade(df_produtos, fundo_path, n_layout):
 
     st.balloons()
     st.success("✅ Arte gerada com sucesso e alinhada aos pixels reais!")
-
     if faltantes:
         st.warning(f"⚠️ {len(faltantes)} produto(s) não tinham imagem!")
 
     st.image(out_path, caption="Sua arte está pronta!",
              use_container_width=True)
+
     with open(out_path, "rb") as f:
         st.download_button(
             label="💾 BAIXAR IMAGEM ALTA RESOLUÇÃO (JPG)",
@@ -627,11 +729,10 @@ def acionar_gerador_grade(df_produtos, fundo_path, n_layout):
             use_container_width=True
         )
 
+
 # ==========================================
 # 2. GERADOR ARTES INDIVIDUAIS
 # ==========================================
-
-
 def acionar_gerador_individual(df_produtos, fundo_path):
     st.toast("🎨 Gerando Artes Individuais...", icon="⏳")
     base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -647,7 +748,6 @@ def acionar_gerador_individual(df_produtos, fundo_path):
 
     produtos = df_produtos.to_dict("records")
     img_idx = obter_indice_imagens()
-
     faltantes = []
     gerados = []
 
@@ -655,8 +755,8 @@ def acionar_gerador_individual(df_produtos, fundo_path):
         codigo = normalizar_codigo_imagem(row.get("Código", ""))
         desc = str(row.get("Descrição", "")).strip()
         preco = row.get("Preço Final", row.get("Preço Atual", 0.0))
-
         img_path = img_idx.get(codigo)
+
         bg = Image.open(fundo_path).convert("RGBA")
         draw = ImageDraw.Draw(bg)
 
@@ -708,6 +808,7 @@ def acionar_gerador_individual(df_produtos, fundo_path):
                     w = draw.textlength(teste, font=fonte_d)
                 except:
                     w = draw.textbbox((0, 0), teste, font=fonte_d)[2]
+
                 if w <= largura_max:
                     linha_atual = teste
                 else:
@@ -716,6 +817,7 @@ def acionar_gerador_individual(df_produtos, fundo_path):
                     linha_atual = p
             if linha_atual:
                 linhas.append(linha_atual)
+
             if len(linhas) <= 3:
                 break
             tamanho_desc -= 4
@@ -741,8 +843,8 @@ def acionar_gerador_individual(df_produtos, fundo_path):
         box_x1, box_x2 = 1579, 1906
         box_y1, box_y2 = 321, 442
         box_w, box_h = box_x2 - box_x1, box_y2 - box_y1
-        tamanho_preco_int = 250
 
+        tamanho_preco_int = 250
         while tamanho_preco_int > 40:
             tamanho_preco_cent = int(tamanho_preco_int * 0.5)
             fonte_p_int = carregar_fonte(font_preco, tamanho_preco_int)
@@ -752,10 +854,12 @@ def acionar_gerador_individual(df_produtos, fundo_path):
                 w_int = draw.textlength(inteiro, font=fonte_p_int)
             except:
                 w_int = draw.textbbox((0, 0), inteiro, font=fonte_p_int)[2]
+
             try:
                 w_cent = draw.textlength(centavo, font=fonte_p_cent)
             except:
                 w_cent = draw.textbbox((0, 0), centavo, font=fonte_p_cent)[2]
+
             try:
                 bbox_int = draw.textbbox((0, 0), inteiro, font=fonte_p_int)
                 h_int = bbox_int[3] - bbox_int[1]
@@ -796,18 +900,18 @@ def acionar_gerador_individual(df_produtos, fundo_path):
     if faltantes:
         st.warning(
             f"⚠️ {len(faltantes)} produto(s) com 'Imagem Indisponível'.")
+
     return gerados
+
 
 # ==========================================
 # 3. GERADOR PDF COM PLANILHA
 # ==========================================
-
-
 def gerar_pdf_planilha(df_produtos):
     st.toast("📄 Gerando PDF interativo...", icon="⏳")
     img_idx = obter_indice_imagens()
-    buffer = BytesIO()
 
+    buffer = BytesIO()
     page_width, page_height = landscape(letter)
     c = pdfcanvas.Canvas(buffer, pagesize=(page_width, page_height))
     form = c.acroForm
@@ -816,7 +920,6 @@ def gerar_pdf_planilha(df_produtos):
     margem_dir = 20
     margem_top = 20
     margem_bottom = 20
-
     largura_util = page_width - margem_esq - margem_dir
     altura_util = page_height - margem_top - margem_bottom
 
@@ -866,24 +969,26 @@ def gerar_pdf_planilha(df_produtos):
                                          ] + "...") if len(linhas[-1]) > 3 else "..."
             else:
                 linhas = [sobra[:max_chars_l1 - 3] + "..."]
+
         return linhas[:2]
 
     def desenhar_cabecalho_pagina():
         c.setFont("Helvetica-Bold", 14)
         c.setFillColor(colors.HexColor("#002D62"))
-        c.drawString(margem_esq, page_height -
-                     margem_top, f"Tabela de Produtos - {datetime.now().strftime('%d/%m/%Y')}")
+        c.drawString(
+            margem_esq, page_height - margem_top, f"Tabela de Produtos - {datetime.now().strftime('%d/%m/%Y')}")
 
         y_header_top = page_height - margem_top - titulo_h
         y_header_bottom = y_header_top - header_h
 
         c.setFillColor(colors.HexColor("#002D62"))
-        c.rect(margem_esq, y_header_bottom,
-               largura_util, header_h, fill=1, stroke=0)
+        c.rect(margem_esq, y_header_bottom, largura_util,
+               header_h, fill=1, stroke=0)
 
         c.setFillColor(colors.white)
         c.setFont("Helvetica-Bold", 10)
-        c.drawCentredString(x_foto + col_foto / 2, y_header_bottom + 7, "Foto")
+        c.drawCentredString(x_foto + col_foto / 2,
+                            y_header_bottom + 7, "Foto")
         c.drawCentredString(x_desc + col_desc / 2,
                             y_header_bottom + 7, "Código / Descrição")
         c.drawCentredString(x_preco + col_preco / 2,
@@ -892,7 +997,6 @@ def gerar_pdf_planilha(df_produtos):
         c.drawCentredString(x_qtd + col_qtd / 2, y_header_bottom + 7, "Qtd")
 
         return y_header_bottom
-
     def desenhar_linha(y_top, row, idx_global):
         y_bottom = y_top - row_h
 
@@ -900,8 +1004,8 @@ def gerar_pdf_planilha(df_produtos):
             c.setFillColor(colors.white)
         else:
             c.setFillColor(colors.HexColor("#F7F7F7"))
-        c.rect(margem_esq, y_bottom, largura_util, row_h, fill=1, stroke=0)
 
+        c.rect(margem_esq, y_bottom, largura_util, row_h, fill=1, stroke=0)
         c.setStrokeColor(colors.grey)
         c.rect(margem_esq, y_bottom, largura_util, row_h, fill=0, stroke=1)
 
@@ -1172,6 +1276,7 @@ def carregar_dados():
         df['Preço_14'] = pd.to_numeric(df[7], errors='coerce')
         df['Preço_21'] = pd.to_numeric(df[9], errors='coerce')
         df['Preço_28'] = pd.to_numeric(df[11], errors='coerce')
+
         df['ST_Flag'] = df.get(12, pd.Series()).fillna(
             "").astype(str).str.strip()
 
@@ -1181,10 +1286,12 @@ def carregar_dados():
 
         df['Desc_Norm'] = df['Descrição'].apply(
             lambda x: re.sub(r'\s+', ' ', str(x).strip().upper()))
+
         df['Camp_Bateu'] = df['Desc_Norm'].isin(descricoes_bateu)
 
         df['Indústria'] = df['Desc_Norm'].map(dict_bateu_ind).fillna(pd.Series(np.random.choice(
             lista_industrias, size=len(df)) if lista_industrias else 'Sem Indústria', index=df.index))
+
         df['Marca_BL'] = df['Desc_Norm'].map(dict_bateu_mar)
         mask_missing = df['Marca_BL'].isna() | (df['Marca_BL'] == '')
         df['Marca'] = df['Marca_BL']
@@ -1196,786 +1303,408 @@ def carregar_dados():
         df['Fator_Anterior'] = np.random.choice(
             [1.0, 1.05, 1.15, 0.95], size=len(df), p=[0.5, 0.2, 0.1, 0.2])
 
-        curva_abc_set = set(curva_abc_codigos)
+        curva_abc_codigos_limpos = [re.sub(
+            r"\D", "", c) for c in curva_abc_codigos]
 
-        def eh_curva_abc(cod):
-            num = re.sub(r"\D", "", str(cod).split("-")[0])
-            return num in curva_abc_set
-        df['Curva_ABC'] = df['Código'].apply(eh_curva_abc)
+        def calcular_status_e_preco(row):
+            cod_limpo = re.sub(r"\D", "", row['Código'].split("-")[0])
 
-        def checar_meta_mensal(row):
-            desc = str(row.get('Desc_Norm', '')).upper()
-            marca = str(row.get('Marca', '')).upper()
-            cat = str(row.get('Categoria', '')).upper()
+            if cod_limpo in curva_abc_codigos_limpos:
+                return pd.Series(["OFERTA DA SEMANA", row['Preço_7'], row['Preço_7'] * row['Fator_Anterior']])
 
-            if 'ESCOLA' in cat or 'PAPELARIA' in cat:
-                return True
-            if 'INSETICIDA' in cat or 'INSETICIDA' in desc:
-                return True
-            if 'FOLHALEV' in marca or 'FOLHA LEV' in marca:
-                return True
-            if 'BABYSEC' in marca or 'BABY SEC' in marca:
-                return True
-            if 'CHAMEX' in marca or 'CHAMEX' in desc:
-                return True
-            if 'CHAMEQUINHO' in marca or 'CHAMEQUINHO' in desc:
-                return True
-            if ('LIMAO' in marca or 'LIMÃO' in marca) and ('LIXO' in desc or 'SACO' in desc):
-                return True
-            if 'LIMAO' in desc and 'LIXO' in desc:
-                return True
-            if 'NETZ' in marca and ('LIXO' in desc or 'SACO' in desc):
-                return True
-            if 'NETZ' in desc and 'LIXO' in desc:
-                return True
-            return False
+            precos = []
+            for p in [row['Preço_7'], row['Preço_14'], row['Preço_21'], row['Preço_28']]:
+                if pd.notna(p) and p > 0:
+                    precos.append(p)
 
-        df['Meta_Mensal'] = df.apply(checar_meta_mensal, axis=1)
+            if not precos:
+                return pd.Series(["PREÇO INDISPONÍVEL", 0.0, 0.0])
 
-        # TO PODENDO
-        codigos_podendo_exatos, codigos_podendo_parciais = set(), set()
-        try:
-            df_podendo = pd.read_excel(
-                caminho_planilha, sheet_name="TO PODENDO", header=None, engine='openpyxl')
-            for col in df_podendo.columns:
-                for val in df_podendo[col].dropna():
-                    val_str = str(val).strip().upper()
-                    if 'E+' in val_str:
-                        raiz = re.sub(r'\D', '', val_str.split('E')[0])
-                        if len(raiz) >= 4:
-                            codigos_podendo_parciais.add(raiz)
-                    else:
-                        v_num = re.sub(r'\D', '', val_str)
-                        if len(v_num) >= 4:
-                            codigos_podendo_exatos.add(v_num)
-        except Exception:
-            pass
+            preco_atual = precos[0]
+            preco_anterior = preco_atual * row['Fator_Anterior']
+            return pd.Series(["PREÇO NORMAL", preco_atual, preco_anterior])
 
-        def cruzar_ean_podendo(idx):
-            val_b = re.sub(r'\D', '', str(coluna_b_original.get(idx, "")))
-            val_a = re.sub(r'\D', '', str(df.at[idx, 'Código']))
-            if val_b and val_b in codigos_podendo_exatos:
-                return True
-            if val_a and val_a in codigos_podendo_exatos:
-                return True
-            for parcial in codigos_podendo_parciais:
-                if val_b and val_b.startswith(parcial):
-                    return True
-                if val_a and val_a.startswith(parcial):
-                    return True
-            return False
+        df[['Status', 'Preço Atual', 'Preço Anterior']
+           ] = df.apply(calcular_status_e_preco, axis=1)
 
-        df['Camp_ToPodendo'] = [cruzar_ean_podendo(idx) for idx in df.index]
-        if not df['Camp_ToPodendo'].any():
-            marcas_podendo = ['KINDER', 'MAGGI', 'GAROTO',
-                              'NESTLE', 'SUFRESH', 'TODDY', 'NESCAU']
-
-            def fallback_podendo(desc):
-                for m in marcas_podendo:
-                    if m in desc:
-                        return True
-                return False
-            df['Camp_ToPodendo'] = df['Desc_Norm'].apply(fallback_podendo)
-
-        # COLGATE
-        codigos_colgate_exatos, codigos_colgate_parciais = set(), set()
-        try:
-            df_colgate = pd.read_excel(
-                caminho_planilha, sheet_name="COLGATE", header=None, engine='openpyxl')
-            for col in df_colgate.columns:
-                for val in df_colgate[col].dropna():
-                    val_str = str(val).strip().upper()
-                    if 'E+' in val_str:
-                        raiz = re.sub(r'\D', '', val_str.split('E')[0])
-                        if len(raiz) >= 4:
-                            codigos_colgate_parciais.add(raiz)
-                    else:
-                        v_num = re.sub(r'\D', '', val_str)
-                        if len(v_num) >= 4:
-                            codigos_colgate_exatos.add(v_num)
-        except Exception:
-            pass
-
-        def cruzar_ean_colgate(idx):
-            val_b = re.sub(r'\D', '', str(coluna_b_original.get(idx, "")))
-            val_a = re.sub(r'\D', '', str(df.at[idx, 'Código']))
-            if val_b and val_b in codigos_colgate_exatos:
-                return True
-            if val_a and val_a in codigos_colgate_exatos:
-                return True
-            for parcial in codigos_colgate_parciais:
-                if val_b and val_b.startswith(parcial):
-                    return True
-                if val_a and val_a.startswith(parcial):
-                    return True
-            return False
-
-        df['Camp_Colgate'] = [cruzar_ean_colgate(idx) for idx in df.index]
-        if not df['Camp_Colgate'].any():
-            marcas_colgate = ['COLGATE', 'SORRISO',
-                              'PROTEX', 'PALMOLIVE', 'AJAX', 'PINHO SOL']
-
-            def fallback_colgate(desc):
-                for m in marcas_colgate:
-                    if m in desc:
-                        return True
-                return False
-            df['Camp_Colgate'] = df['Desc_Norm'].apply(fallback_colgate)
-
+        return df, lista_industrias
     except Exception as e:
-        st.error(f"Erro ao carregar Excel: {e}")
-        df = pd.DataFrame()
-
-    return df, curva_abc_codigos
-
-
-# ==============================================================
-# CARREGAMENTO SEGURO DA SESSÃO
-# ==============================================================
-try:
-    df_raw, lista_abc = carregar_dados()
-except ValueError:
-    st.cache_data.clear()
-    df_raw, lista_abc = carregar_dados()
-
-st.session_state['codigos_abc_planilha'] = lista_abc
-
-
-def atualizar_prazo():
-    novo_prazo = st.session_state.prazo_selector
-    if not novo_prazo:
-        novo_prazo = "Preço_7"
-    for prod in st.session_state['produtos_selecionados']:
-        cod = prod['Código']
-        row = df_raw[df_raw['Código'] == cod]
-        if not row.empty:
-            novo_preco = row.iloc[0][novo_prazo]
-            if pd.isna(novo_preco):
-                novo_preco = row.iloc[0]['Preço_7']
-
-            prod['Preço Atual'] = float(novo_preco)
-            st.session_state[f"pr_{cod}"] = float(novo_preco)
-            atualizar_valores_uid(u_id=cod)
-
+        st.error(f"Erro ao processar dados: {e}")
+        return pd.DataFrame(), []
 
 # ==========================================
-# INTERFACE DO STREAMLIT
+# INTERFACE PRINCIPAL
 # ==========================================
+
+
+df_completo, lista_inds = carregar_dados()
+
 with st.sidebar:
-    st.image("https://cdn-icons-png.flaticon.com/512/3144/3144456.png", width=60)
-    
-    # ==========================================
-    # 1. NOVO CAMPO: PEDIDO CLIENTE (UPLOAD PDF)
-    # ==========================================
-    st.markdown("<p class='subtitulo'>Pedido Cliente</p>", unsafe_allow_html=True)
-    pdf_pedido = st.file_uploader("Upload de Pedido (PDF)", type=["pdf"], key="pdf_pedido_upload")
-    
-    if pdf_pedido is not None:
-        if st.button("Processar Pedido", use_container_width=True, type="primary"):
-            try:
-                import pdfplumber
-                with pdfplumber.open(pdf_pedido) as pdf:
-                    texto_pdf = ""
-                    for page in pdf.pages:
-                        texto_pdf += page.extract_text() + "\n"
-                
-                codigos_encontrados = []
-                # Procura no texto do PDF por linhas que começam com o código (ex: 71718-3)
-                for line in texto_pdf.split('\n'):
-                    m = re.match(r'^\s*(\d{3,}(?:-\d+)?)', line)
-                    if m:
-                        codigos_encontrados.append(m.group(1))
-
-                if codigos_encontrados:
-                    faltantes_ped = []
-                    adicionados_ped = 0
-                    
-                    df_base_ped = df_raw.copy()
-                    prazo_atual = st.session_state.get('prazo_selector', 'Preço_7')
-                    if not prazo_atual:
-                        prazo_atual = 'Preço_7'
-                        
-                    for cod_raw in codigos_encontrados:
-                        # Extrai apenas os números antes do traço para buscar na base
-                        cod_limpo = re.sub(r"\D", "", str(cod_raw).split("-")[0])
-                        
-                        df_match = df_base_ped[df_base_ped['Código'].apply(
-                            lambda x: re.sub(r"\D", "", str(x).split("-")[0])) == cod_limpo]
-                        
-                        if df_match.empty:
-                            faltantes_ped.append(cod_raw)
-                        else:
-                            r = df_match.iloc[0]
-                            preco_base = r[prazo_atual] if pd.notna(r[prazo_atual]) else r['Preço_7']
-                            
-                            # Adiciona se já não estiver na lista
-                            if not any(d['Código'] == r['Código'] for d in st.session_state['produtos_selecionados']):
-                                st.session_state['produtos_selecionados'].append({
-                                    'Levar': True, 'Código': r['Código'], 'Status': 'Incluído via Pedido',
-                                    'Descrição': r['Descrição'], 'Preço Atual': float(preco_base),
-                                    'Comissão': 0.0, 'FLEX': 0.0, 'DESC': 0.0, 'Imposto': False,
-                                    'Preço Final': float(preco_base), 'ST_Flag': r.get('ST_Flag', '')
-                                })
-                                adicionados_ped += 1
-                                
-                    if faltantes_ped:
-                        st.warning(f"⚠️ {len(faltantes_ped)} código(s) do PDF não localizados na base.")
-                    if adicionados_ped > 0:
-                        st.success(f"✅ {adicionados_ped} produto(s) adicionados ao painel!")
-                        time.sleep(1.5)
-                        st.rerun()
-                else:
-                    st.warning("Nenhum código reconhecido no PDF.")
-                    
-            except ImportError:
-                st.error("Biblioteca não instalada. Feche o app e execute: pip install pdfplumber")
-            except Exception as e:
-                st.error(f"Erro ao ler PDF: {e}")
-                
-    st.divider()
-
-    # ==========================================
-    # LAYOUT DO ENCARTE (Existente)
-    # ==========================================
-    st.markdown("<p class='subtitulo'>Layout do Encarte</p>",
-                unsafe_allow_html=True)
-
-    if 'num_produtos_layout' not in st.session_state:
-        st.session_state['num_produtos_layout'] = 0
-
-    opcoes_layout = {0: "Sem Limite", 9: "9 Espaços", 12: "12 Espaços",
-                     16: "16 Espaços", 20: "20 Espaços"}
-    layout_selecionado = st.segmented_control(
-        "Escolha o formato:", options=list(opcoes_layout.keys()),
-        format_func=lambda x: opcoes_layout[x], selection_mode="single",
-        default=st.session_state.get('num_produtos_layout', 0),
-        key=f"layout_selector_dinamico_{st.session_state.get('num_produtos_layout', 0)}"
-    )
-
-    if layout_selecionado is not None and layout_selecionado != st.session_state['num_produtos_layout']:
-        st.session_state['num_produtos_layout'] = layout_selecionado
-
-    num_produtos = st.session_state['num_produtos_layout']
-    st.divider()
-
-    # ==========================================
-    # 2. NOVA LINHA: DATA DA ÚLTIMA ATUALIZAÇÃO DA BASE
-    # ==========================================
-    base_dir_app = os.path.dirname(os.path.abspath(__file__))
-    caminho_planilha_app = os.path.join(base_dir_app, "Programa_Destro-04-03.xlsx")
-    if os.path.exists(caminho_planilha_app):
-        mtime = os.path.getmtime(caminho_planilha_app)
-        data_atualizacao = datetime.fromtimestamp(mtime).strftime("%d/%m/%Y às %H:%M")
-        st.markdown(f"<div style='text-align:center; font-size:12px; color:#64748b; margin-bottom:10px; padding:5px; background-color:#e2e8f0; border-radius:4px;'>📅 Base Excel atualizada em: <b>{data_atualizacao}</b></div>", unsafe_allow_html=True)
-
-    # ==========================================
-    # PRAZO DE PAGAMENTO (Existente)
-    # ==========================================
-    st.markdown("<p class='subtitulo'>Prazo de Pagamento</p>",
-                unsafe_allow_html=True)
-    opcoes_prazo = {"Preço_7": "7 Dias", "Preço_14": "14 Dias",
-                    "Preço_21": "21 Dias", "Preço_28": "28 Dias"}
-    prazo_selecionado = st.segmented_control(
-        "Escolha o prazo:", options=list(opcoes_prazo.keys()),
-        format_func=lambda x: opcoes_prazo[x], default="Preço_7",
-        selection_mode="single", key="prazo_selector", on_change=atualizar_prazo
-    )
-    if not prazo_selecionado:
-        prazo_selecionado = "Preço_7"
-
-    df_app = df_raw.copy()
-    if not df_app.empty:
-        df_app['Preço Atual'] = df_app[prazo_selecionado].fillna(
-            df_app['Preço_7'])
-        df_app['Preço Anterior'] = df_app['Preço Atual'] * \
-            df_app['Fator_Anterior']
-        df_app['Preço Anterior'] = np.where(
-            df_app['Preço Anterior'] == 0, 1, df_app['Preço Anterior'])
-        df_app['Desconto %'] = (
-            (df_app['Preço Anterior'] - df_app['Preço Atual']) / df_app['Preço Anterior'] * 100).round(1)
-
-        def gerar_status(row):
-            perc = row['Desconto %']
-            if row['Preço Atual'] < row['Preço Anterior']:
-                return f"🟢 Baixou! (-{abs(perc)}%)"
-            elif row['Preço Atual'] > row['Preço Anterior']:
-                return f"🔴 Aumentou! (+{abs(perc)}%)"
-            else:
-                return "⚫ Igual"
-        df_app['Status'] = df_app.apply(gerar_status, axis=1)
-
-    df_filtrado = df_app.copy()
-    st.divider()
-
-    st.markdown("<p class='subtitulo'>🔥 Filtros Inteligentes</p>",
-                unsafe_allow_html=True)
-    col_f1, col_f2 = st.columns(2)
-    with col_f1:
-        filtro_abc = st.checkbox("Curva ABC")
-    with col_f2:
-        filtro_metas = st.checkbox("Metas Mensal (PRO)")
-
-    if filtro_abc and not df_filtrado.empty:
-        df_filtrado = df_filtrado[df_filtrado['Curva_ABC'] == True]
-    if filtro_metas and not df_filtrado.empty:
-        df_filtrado = df_filtrado[df_filtrado['Meta_Mensal'] == True]
-
-    st.divider()
-    st.markdown("<p class='subtitulo'>Campanhas</p>", unsafe_allow_html=True)
-    c_bateu = st.checkbox("BATEU LEVOU")
-    c_podendo = st.checkbox("TO PODENDO")
-    c_sellout = st.checkbox("SELL OUT")
-    c_colgate = st.checkbox("COLGATE")
-
-    if not df_filtrado.empty and (c_bateu or c_podendo or c_sellout or c_colgate):
-        mask_campanhas = pd.Series(False, index=df_filtrado.index)
-        if c_bateu:
-            mask_campanhas = mask_campanhas | df_filtrado['Camp_Bateu']
-        if c_colgate:
-            mask_campanhas = mask_campanhas | df_filtrado['Camp_Colgate']
-        if c_podendo:
-            mask_campanhas = mask_campanhas | df_filtrado['Camp_ToPodendo']
-        if c_sellout:
-            mask_campanhas = mask_campanhas | (
-                df_filtrado['Campanha'] == 'SELL OUT') if 'Campanha' in df_filtrado.columns else mask_campanhas
-
-        df_filtrado = df_filtrado[mask_campanhas]
-        if df_filtrado.empty:
-            st.warning(
-                "⚠️ Nenhum produto encontrado com os filtros atuais selecionados.")
-
-    st.divider()
-    st.markdown("<p class='subtitulo'>Filtros de Busca (Cascata)</p>",
-                unsafe_allow_html=True)
-    if not df_filtrado.empty:
-        industrias_disp = sorted(
-            [str(x) for x in df_filtrado['Indústria'].dropna().unique() if str(x).strip() != ''])
-        industria_f = st.selectbox("1. Indústria", options=[
-                                   'Todas'] + industrias_disp)
-        if industria_f != 'Todas':
-            df_filtrado = df_filtrado[df_filtrado['Indústria'] == industria_f]
-
-        marcas_disp = sorted(
-            [str(x) for x in df_filtrado['Marca'].dropna().unique() if str(x).strip() != ''])
-        marca_f = st.selectbox("2. Marca", options=['Todas'] + marcas_disp)
-        if marca_f != 'Todas':
-            df_filtrado = df_filtrado[df_filtrado['Marca'] == marca_f]
-
-        cats_disp = sorted([str(x) for x in df_filtrado['Categoria'].dropna(
-        ).unique() if str(x).strip() not in ('', 'Sem Categoria')])
-        categoria_f = st.selectbox(
-            "3. Categoria", options=['Todas'] + cats_disp)
-        if categoria_f != 'Todas':
-            df_filtrado = df_filtrado[df_filtrado['Categoria'] == categoria_f]
-    else:
-        st.info("Nenhum item disponível para filtrar nessas categorias.")
-
-    st.session_state["df_filtrado_atual"] = df_filtrado.copy()
-
-
-tab1, tab2 = st.tabs(["📊 Montagem do Tabloide", "🤖 IA Limpador"])
-
-with tab1:
-    if not df_app.empty:
-        df_baixou = df_app[df_app['Status'].str.contains("Baixou")]
-        top_10 = df_baixou.nlargest(10, 'Desconto %')
-        if not top_10.empty:
-            img_idx_global = obter_indice_imagens()
-            html_items = ""
-            for _, r in top_10.iterrows():
-                cod = normalizar_codigo_imagem(r['Código'])
-                caminho_img = img_idx_global.get(cod)
-                b64_str = image_to_base64(caminho_img)
-                img_tag = f"<img src='data:image/jpeg;base64,{b64_str}' style='height:40px; border-radius:4px; vertical-align:middle; margin-right:8px; background-color:white;' />" if b64_str else ""
-                desc_curta = str(r['Descrição'])[
-                    :30] + "..." if len(str(r['Descrição'])) > 30 else str(r['Descrição'])
-                html_items += f"<span style='display:inline-block; margin:0 40px; align-items:center;'>{img_tag}🔥 {desc_curta} <span style='background-color:#00E676; color:#002D62; padding:2px 8px; border-radius:12px; font-weight:800; margin-left:8px;'>-{r['Desconto %']}%</span> (De: R$ <strike>{r['Preço Anterior']:.2f}</strike> | Por: R$ {r['Preço Atual']:.2f})</span>"
-
-            banner_html = f"<!DOCTYPE html><html><head><style>body{{margin:0;padding:0;background-color:transparent;font-family:sans-serif;}}.mq-container{{width:100%;overflow:hidden;background-color:#002D62;color:white;padding:12px 0;border-radius:8px;box-shadow:0 4px 6px rgba(0,0,0,0.1);white-space:nowrap;}}.mq-content{{display:inline-block;animation:scroll 25s linear infinite;font-size:18px;font-weight:600;white-space:nowrap;}}.mq-container:hover .mq-content{{animation-play-state:paused;}}@keyframes scroll{{0%{{transform:translateX(100vw);}}100%{{transform:translateX(-100%);}}}} </style></head><body><div class='mq-container'><div class='mq-content'>{html_items}</div></div></body></html>"
-            st.components.v1.html(banner_html, height=65)
-
-    st.markdown("<p class='titulo-secao'>🤖 Geradores Automáticos (20 Espaços)</p>",
-                unsafe_allow_html=True)
-
-    cg1, cg2, cg3, cg4 = st.columns(4)
-
-    with cg1:
-        if st.button("✨ TODAS CAMPANHAS (PRO)", use_container_width=True):
-            st.session_state['produtos_selecionados'] = []
-            st.session_state['num_produtos_layout'] = 20
-            add_auto_products(df_app[df_app['Camp_Bateu'] == True].sort_values(
-                'Desconto %', ascending=False), 5)
-            add_auto_products(df_app[df_app['Curva_ABC'] == True], 5)
-            add_auto_products(df_app[df_app['Camp_Colgate'] == True].sort_values(
-                'Desconto %', ascending=False), 3)
-            add_auto_products(df_app[df_app['Camp_ToPodendo'] == True].sort_values(
-                'Desconto %', ascending=False), 3)
-            add_auto_products(df_app[df_app['Meta_Mensal'] == True].sort_values(
-                'Desconto %', ascending=False), 4)
-            st.rerun()
-
-    with cg2:
-        if st.button("💥 BATEU LEVOU (20 Itens)", use_container_width=True):
-            st.session_state['produtos_selecionados'] = []
-            st.session_state['num_produtos_layout'] = 20
-            add_auto_products(df_app[df_app['Camp_Bateu'] == True].sort_values(
-                'Desconto %', ascending=False), 20)
-            st.rerun()
-
-    with cg3:
-        if st.button("🎯 META MENSAL - PRO (20 Itens)", use_container_width=True):
-            st.session_state['produtos_selecionados'] = []
-            st.session_state['num_produtos_layout'] = 20
-            add_auto_products(df_app[df_app['Meta_Mensal'] == True].sort_values(
-                'Desconto %', ascending=False), 20)
-            st.rerun()
-
-    with cg4:
-        if st.button("📈 CURVA ABC", use_container_width=True):
-            st.session_state['produtos_selecionados'] = []
-            st.session_state['num_produtos_layout'] = 20
-            faltantes = []
-            codigos_para_adicionar = st.session_state.get(
-                'codigos_abc_planilha', [])
-
-            for cod in codigos_para_adicionar:
-                df_match = df_app[df_app['Código'].apply(
-                    lambda x: re.sub(r"\D", "", str(x).split("-")[0])) == cod]
-                if df_match.empty:
-                    faltantes.append(cod)
-                else:
-                    r = df_match.iloc[0]
-                    if not any(d['Código'] == r['Código'] for d in st.session_state['produtos_selecionados']):
-                        st.session_state['produtos_selecionados'].append({
-                            'Levar': True, 'Código': r['Código'], 'Status': r['Status'],
-                            'Descrição': r['Descrição'], 'Preço Atual': float(r['Preço Atual']),
-                            'Comissão': 0.0, 'FLEX': 0.0, 'DESC': 0.0, 'Imposto': False,
-                            'Preço Final': float(r['Preço Atual']), 'ST_Flag': r.get('ST_Flag', '')
-                        })
-
-            if faltantes:
-                st.warning(
-                    f"⚠️ {len(faltantes)} produto(s) da Curva ABC não foram encontrados na aba Banco_Dados_Semanal.")
-            st.rerun()
-
+    st.image("https://logodownload.org/wp-content/uploads/2014/11/destro-macroatacado-logo-2.png",
+             use_container_width=True)
     st.markdown("---")
-    st.markdown("<p class='titulo-secao'>Selecionar Produtos Manualmente</p>",
-                unsafe_allow_html=True)
+    st.markdown("### 🏷️ Filtros Dinâmicos")
+
+    if not df_completo.empty:
+        status_ops = ["Todos"] + list(df_completo['Status'].unique())
+        sel_status = st.selectbox("Status:", status_ops)
+
+        cat_ops = ["Todas"] + sorted(df_completo['Categoria'].unique())
+        sel_cat = st.selectbox("Categoria:", cat_ops)
+
+        ind_ops = ["Todas"] + lista_inds
+        sel_ind = st.selectbox("Indústria:", ind_ops)
+
+        lista_marcas_todas = sorted(df_completo['Marca'].dropna().unique())
+        marca_ops = ["Todas"] + lista_marcas_todas
+        sel_marca = st.selectbox("Marca:", marca_ops)
+
+        bateu_ops = ["Todos", "Apenas Bateu Levou"]
+        sel_bateu = st.selectbox("Campanha:", bateu_ops)
+
+        # ----------------------------------------------------
+        # MENU LATERAL - LAYOUT DO TABLOIDE EM GRADE
+        # ----------------------------------------------------
+        st.markdown("---")
+        st.markdown("### 🖼️ Layout do Tabloide (Grade)")
+        st.markdown(
+            "*Escolha a quantidade de produtos para o encarte em grade.*")
+
+        col_l1, col_l2 = st.columns(2)
+        col_l3, col_l4 = st.columns(2)
+        col_l5 = st.columns(1)[0]
+
+        def set_layout(n):
+            st.session_state['num_produtos_layout'] = n
+
+        btn_style = """
+            <style>
+            div.stButton > button {
+                width: 100%;
+                font-weight: bold;
+                border: 1px solid #e2e8f0;
+                background-color: #f8fafc;
+            }
+            div.stButton > button:hover {
+                border-color: #2563eb;
+                background-color: #eff6ff;
+            }
+            </style>
+        """
+        st.markdown(btn_style, unsafe_allow_html=True)
+
+        n_atual = st.session_state.get('num_produtos_layout', 0)
+
+        with col_l1:
+            if st.button("09 Espaços", type="primary" if n_atual == 9 else "secondary"):
+                set_layout(9)
+                st.rerun()
+        with col_l2:
+            if st.button("12 Espaços", type="primary" if n_atual == 12 else "secondary"):
+                set_layout(12)
+                st.rerun()
+        with col_l3:
+            if st.button("16 Espaços", type="primary" if n_atual == 16 else "secondary"):
+                set_layout(16)
+                st.rerun()
+        with col_l4:
+            if st.button("20 Espaços", type="primary" if n_atual == 20 else "secondary"):
+                set_layout(20)
+                st.rerun()
+        with col_l5:
+            if st.button("❌ Sem Limite / Artes Individuais", type="primary" if n_atual == 0 else "secondary", use_container_width=True):
+                set_layout(0)
+                st.rerun()
+
+        lim_str = "Sem limite (Apenas Individual)" if n_atual == 0 else f"{n_atual} produtos."
+        st.info(f"**Limite atual configurado:** {lim_str}")
+        st.markdown(
+            "*(Para Artes Individuais e PDF de Planilha, o layout não importa)*")
+
+if not df_completo.empty:
+    df_filtrado = df_completo.copy()
+    if sel_status != "Todos":
+        df_filtrado = df_filtrado[df_filtrado['Status'] == sel_status]
+    if sel_cat != "Todas":
+        df_filtrado = df_filtrado[df_filtrado['Categoria'] == sel_cat]
+    if sel_ind != "Todas":
+        df_filtrado = df_filtrado[df_filtrado['Indústria'] == sel_ind]
+    if sel_marca != "Todas":
+        df_filtrado = df_filtrado[df_filtrado['Marca'] == sel_marca]
+    if sel_bateu == "Apenas Bateu Levou":
+        df_filtrado = df_filtrado[df_filtrado['Camp_Bateu'] == True]
+
+    st.session_state["df_filtrado_atual"] = df_filtrado
 
     img_idx_busca = obter_indice_imagens()
-    codigos_ja_selecionados = [p['Código']
-                               for p in st.session_state['produtos_selecionados']]
+    codigos_ja_selecionados = [p['Código'] for p in st.session_state['produtos_selecionados']]
 
-if caminho_img and os.path.exists(caminho_img):
-    with st.popover("📤 Trocar", use_container_width=True):
-        st.caption("Selecione a nova imagem do produto")
-        nova_img = st.file_uploader(
-            "Imagem do produto",
-            type=['png', 'jpg', 'jpeg', 'webp'],
-            key=f"up_trocar_{uid}",
+    if not df_filtrado.empty:
+        def formatar_opcao(x):
+            preco_atual = f"R$ {x['Preço Atual']:.2f}"
+            preco_antigo = f"R$ {x['Preço Anterior']:.2f}"
+            tem_foto = "📸 Com Foto" if normalizar_codigo_imagem(x['Código']) in img_idx_busca else "❌ Sem Foto"
+            texto_base = f"{x['Código']} | {x['Descrição']} | Atual: {preco_atual} (Era: {preco_antigo} - {x['Status']}) | {tem_foto}"
+            return f"🔴 [JÁ ADICIONADO] {texto_base}" if str(x['Código']) in codigos_ja_selecionados else texto_base
+
+        opcoes_busca = df_filtrado.apply(formatar_opcao, axis=1).tolist()
+    else:
+        opcoes_busca = []
+
+    col_busca, col_limpar, col_atualizar = st.columns([5, 1.2, 1.2])
+
+    with col_busca:
+        st.selectbox(
+            "Adicionar Produto:",
+            options=opcoes_busca,
+            key="busca_temp",
+            index=None,
+            placeholder="Digite ou selecione um produto...",
+            on_change=processar_busca,
             label_visibility="collapsed"
         )
-        if nova_img and st.button("Salvar Troca", key=f"btn_trocar_{uid}", type="primary"):
-            salvar_imagem_upload(nova_img, cod)
-            st.rerun()
-else:
-    with st.popover("📤 Subir", use_container_width=True):
-        st.caption("Selecione a imagem do produto")
-        nova_img = st.file_uploader(
-            "Imagem do produto",
-            type=['png', 'jpg', 'jpeg', 'webp'],
-            key=f"up_novo_{uid}",
-            label_visibility="collapsed"
-        )
-        if nova_img and st.button("Salvar Imagem", key=f"btn_novo_{uid}", type="primary"):
-            salvar_imagem_upload(nova_img, cod)
-            st.rerun()
 
     with col_limpar:
         if st.button("🗑️ Esvaziar Tudo", use_container_width=True):
-            st.session_state['produtos_selecionados'], st.session_state['galeria_individuais'], st.session_state['confirmacao_st'] = [
-            ], [], None
+            st.session_state['produtos_selecionados'], st.session_state['galeria_individuais'], st.session_state['confirmacao_st'] = [], [], None
             st.rerun()
+
     with col_atualizar:
         if st.button("🔄 Atualizar App", use_container_width=True):
             st.cache_data.clear()
             st.cache_resource.clear()
             st.rerun()
 
-    txt_limite = "Sem limite" if num_produtos == 0 else f"{num_produtos} espaços"
-    st.markdown(
-        f"**Itens no painel:** {len(st.session_state['produtos_selecionados'])} / {txt_limite}")
-    st.markdown("---")
+    txt_limite = f"{st.session_state['num_produtos_layout']} vagas" if st.session_state['num_produtos_layout'] > 0 else "ilimitado"
+    st.markdown(f"**Painel de Produtos Selecionados:** {len(st.session_state['produtos_selecionados'])} item(s) (Layout: {txt_limite})")
 
-    if len(st.session_state['produtos_selecionados']) == 0:
-        st.info(
-            "O painel está vazio. Busque e adicione produtos acima para montar seu encarte.")
+    st.markdown("""
+        <div class="linha-cabecalho" style="display:flex; padding:8px; border-bottom:2px solid #ccc; font-weight:bold; background-color:#f1f5f9; font-size:0.85em;">
+            <div style="width:40px; text-align:center;">IMG</div>
+            <div style="width:40px; text-align:center;">ON</div>
+            <div style="flex:2; padding-left:10px;">PRODUTO (Cód / Descrição)</div>
+            <div style="width:110px; text-align:center;">IMPOSTO (10.1%)</div>
+            <div style="width:100px; text-align:center;">PREÇO (R$)</div>
+            <div style="width:100px; text-align:center;">COMISSÃO (%)</div>
+            <div style="width:100px; text-align:center;">FLEX (%)</div>
+            <div style="width:100px; text-align:center;">DESC (%)</div>
+            <div style="width:100px; text-align:center;">FINAL (R$)</div>
+            <div style="width:120px; text-align:center;">ORDEM/EXCLUIR</div>
+        </div>
+    """, unsafe_allow_html=True)
+
+    if not st.session_state['produtos_selecionados']:
+        st.info("📌 Nenhum produto selecionado.")
     else:
-        ch_c, stat_c, img_c, desc_c, prec_c, co_c, flex_c, des_c, imp_c, fin_c = st.columns(
-            [1.2, 0.9, 1.0, 2.2, 1.0, 1.3, 1.3, 1.3, 1.0, 1.3])
-        ch_c.markdown("**Ações**")
-        stat_c.markdown("**Status**")
-        img_c.markdown("**Foto**")
-        desc_c.markdown("**Descrição**")
-        prec_c.markdown("**Preço (R$)**")
-        co_c.markdown("**Comissão(%)**")
-        flex_c.markdown("**FLEX(%)**")
-        des_c.markdown("**DESC(%)**")
-        imp_c.markdown("**Imposto**")
-        fin_c.markdown("**FINAL**")
-        st.markdown("---")
+        for i, prod in enumerate(st.session_state['produtos_selecionados']):
+            uid = prod['Código']
+            cod = normalizar_codigo_imagem(uid)
+            desc = prod['Descrição']
+            preco_base = prod['Preço Atual']
+            st_flag = str(prod.get('ST_Flag', '')).strip()
+            caminho_img = img_idx_busca.get(cod)
 
-        img_idx_global = obter_indice_imagens()
+            c_img, c_chk, c_desc, c_imp, c_pr, c_co, c_fl, c_de, c_fi, c_botoes = st.columns([
+                0.4, 0.4, 2, 1.1, 1, 1, 1, 1, 1, 1.2])
 
-    for i, prod in enumerate(st.session_state.produtos_selecionados):
-        uid = prod['Código']
+            with c_img:
+                st.markdown(
+                    "<div style='height: 12px;'></div>", unsafe_allow_html=True)
+                if caminho_img and os.path.exists(caminho_img):
+                    st.image(caminho_img, use_container_width=True)
+                else:
+                    st.markdown(
+                        "<div style='text-align:center; color:red; font-size:24px; line-height:1;'>❌</div>", unsafe_allow_html=True)
 
-        # Garante que as variáveis de sessão essenciais existam antes de renderizar as colunas
-        if f"chk_{uid}" not in st.session_state:
-            st.session_state[f"chk_{uid}"] = prod.get('Levar', True)
-        if f"pr_{uid}" not in st.session_state:
-            st.session_state[f"pr_{uid}"] = float(prod['Preço Atual'])
-        if f"co_{uid}" not in st.session_state:
-            st.session_state[f"co_{uid}"] = float(prod['Comissão'])
-        if f"fl_{uid}" not in st.session_state:
-            st.session_state[f"fl_{uid}"] = float(prod['FLEX'])
-        if f"de_{uid}" not in st.session_state:
-            st.session_state[f"de_{uid}"] = float(prod['DESC'])
-        if f"im_{uid}" not in st.session_state:
-            st.session_state[f"im_{uid}"] = bool(prod.get('Imposto', False))
+            with c_chk:
+                st.checkbox("", value=prod['Levar'], key=f"lev_{uid}", on_change=lambda idx=i,
+                            k=f"lev_{uid}": prod.update({"Levar": st.session_state[k]}))
 
-        c_bt, c_st, c_ig, c_ds, c_pr, c_co, c_fl, c_de, c_im, c_fi = st.columns(
-            [1.2, 0.9, 1.0, 2.2, 1.0, 1.3, 1.3, 1.3, 1.0, 1.3],
-            vertical_alignment="center"
-        )
+            with c_desc:
+                st.markdown(f"**{uid}**<br><span style='font-size:0.85em; color:#475569;'>{desc}</span>",
+                            unsafe_allow_html=True)
+                if st_flag == '*':
+                    st.markdown(
+                        "<span style='font-size:0.7em; color:red; font-weight:bold;'>* SEM S.T (Calcular)</span>", unsafe_allow_html=True)
 
-        with c_bt:
-            # Re-identifica as variáveis locais de imagem para que fiquem disponíveis dentro da coluna
-            cod = normalizar_codigo_imagem(prod['Código'])
-            caminho_img = img_idx_global.get(cod)
+            with c_imp:
+                marcar_imposto_padrao = (
+                    st_flag == '*' and prod['Imposto'] == False)
+                if marcar_imposto_padrao and f"im_{uid}" not in st.session_state:
+                    prod['Imposto'] = True
+                    st.session_state[f"im_{uid}"] = True
 
-            # Primeira linha de ações
-            b1, b2, b3, b4 = st.columns([1.2, 1, 1, 1])
-            with b1:
-                st.session_state.produtos_selecionados[i]['Levar'] = st.checkbox(
-                    "", key=f"chk_{uid}")
-            with b2:
-                if st.button("⬆️", key=f"up_{uid}", type="tertiary"):
-                    mover_cima(i)
-                    st.rerun()
-            with b3:
-                if st.button("⬇️", key=f"dw_{uid}", type="tertiary"):
-                    mover_baixo(i)
-                    st.rerun()
-            with b4:
-                if st.button("❌", key=f"del_{uid}", type="tertiary"):
-                    deletar_item(i)
-                    st.rerun()
+                st.checkbox("Aplicar", value=prod['Imposto'], key=f"im_{uid}",
+                            on_change=atualizar_valores_uid, args=(i, uid))
 
-            # CSS para encolher o popover e não alargar muito a coluna
-            st.markdown("""
-                <style>
-                div[data-testid="stPopover"] > button {
-                    padding: 0 !important;
-                    font-size: 10px !important;
-                    height: 24px !important;
-                    min-height: 24px !important;
-                    margin-top: -10px !important;
-                }
-                </style>
-            """, unsafe_allow_html=True)
+            with c_pr:
+                st.number_input("", value=preco_base, step=0.1, key=f"pr_{uid}",
+                                on_change=atualizar_valores_uid, args=(i, uid), label_visibility="collapsed")
+            with c_co:
+                st.number_input("", value=prod['Comissão'], step=0.1, key=f"co_{uid}",
+                                on_change=atualizar_valores_uid, args=(i, uid), label_visibility="collapsed")
 
-            # Segunda linha de ações (Trocar/Subir imagem)
-            if caminho_img and os.path.exists(caminho_img):
-                with st.popover("📤 Trocar", use_container_width=True):
-                    nova_img = st.file_uploader("", type=[
-                                                'png', 'jpg', 'jpeg', 'webp'], key=f"up_trocar_{uid}", label_visibility="collapsed")
-                    if nova_img and st.button("Salvar Troca", key=f"btn_trocar_{uid}", type="primary"):
-                        salvar_imagem_upload(nova_img, cod)
-                        st.rerun()
-            else:
-                with st.popover("📤 Subir", use_container_width=True):
-                    nova_img = st.file_uploader("", type=[
-                                                'png', 'jpg', 'jpeg', 'webp'], key=f"up_novo_{uid}", label_visibility="collapsed")
-                    if nova_img and st.button("Salvar Imagem", key=f"btn_novo_{uid}", type="primary"):
-                        salvar_imagem_upload(nova_img, cod)
-                        st.rerun()
+            with c_fl:
+                st.number_input("", value=prod['FLEX'], step=0.1, key=f"fl_{uid}",
+                                on_change=atualizar_valores_uid, args=(i, uid), label_visibility="collapsed")
 
-        with c_st:
-            st.write(prod['Status'])
+            with c_de:
+                st.number_input("", value=prod['DESC'], step=0.1, key=f"de_{uid}",
+                                on_change=atualizar_valores_uid, args=(i, uid), label_visibility="collapsed")
 
-        with c_ig:
-            cod = normalizar_codigo_imagem(prod['Código'])
-            caminho_img = img_idx_global.get(cod)
-            url_google = f"https://www.google.com/search?tbm=isch&q={urllib.parse.quote(prod['Descrição'])}"
+            with c_botoes:
+                st.markdown(
+                    "<div style='height: 4px;'></div>", unsafe_allow_html=True)
+                # POPOVER PARA IMAGEM
+                if caminho_img and os.path.exists(caminho_img):
+                                with st.popover("📤 Trocar", use_container_width=True):
+                                    st.caption("Selecione a nova imagem do produto")
+                                    nova_img = st.file_uploader(
+                                        "Imagem do produto",
+                                        type=['png', 'jpg', 'jpeg', 'webp'],
+                                        key=f"up_trocar_{uid}",
+                                        label_visibility="collapsed"
+                                    )
+                                    if nova_img and st.button("Salvar Troca", key=f"btn_trocar_{uid}", type="primary"):
+                                        salvar_imagem_upload(nova_img, cod)
+                                        st.rerun()
+                else:
+                                with st.popover("📤 Subir", use_container_width=True):
+                                    st.caption("Selecione a imagem do produto")
+                                    nova_img = st.file_uploader(
+                                        "Imagem do produto",
+                                        type=['png', 'jpg', 'jpeg', 'webp'],
+                                        key=f"up_novo_{uid}",
+                                        label_visibility="collapsed"
+                                    )
+                                    if nova_img and st.button("Salvar Imagem", key=f"btn_novo_{uid}", type="primary"):
+                                        salvar_imagem_upload(nova_img, cod)
+                                        st.rerun()
 
-            if caminho_img and os.path.exists(caminho_img):
-                st.image(caminho_img, width=45)
-                st.markdown(f"<a href='{url_google}' target='_blank' style='display:block; text-align:center; background-color:#f1f5f9; color:#475569; font-size:9px; font-weight:bold; padding:4px 0; border-radius:4px; text-decoration:none; margin-top:2px; border:1px solid #cbd5e1;'>🔄 Buscar</a>", unsafe_allow_html=True)
-            else:
-                st.markdown("<div style='text-align:center; color:#ff4b4b; font-size:10px; font-weight:bold; line-height:1.2; padding-top:5px; padding-bottom:5px;'>❌<br>Sem Foto</div>", unsafe_allow_html=True)
-                st.markdown(f"<a href='{url_google}' target='_blank' style='display:block; text-align:center; background-color:#3b82f6; color:#ffffff; font-size:9px; font-weight:bold; padding:4px 0; border-radius:4px; text-decoration:none; margin-top:2px;'>🔍 Buscar</a>", unsafe_allow_html=True)
+                st.markdown(
+                    "<div style='height: 4px;'></div>", unsafe_allow_html=True)
+                bc1, bc2, bc3 = st.columns(3)
+                with bc1:
+                    st.button("⬆️", key=f"up_{uid}", on_click=mover_cima,
+                              args=(i,), use_container_width=True)
+                with bc2:
+                    st.button("⬇️", key=f"dn_{uid}", on_click=mover_baixo,
+                              args=(i,), use_container_width=True)
+                with bc3:
+                    st.button("❌", key=f"del_{uid}", on_click=deletar_item,
+                              args=(i,), use_container_width=True)
 
-        with c_ds:
-            cod_base = normalizar_codigo_imagem(prod['Código'])
-            html_copy = f"""
-            <html><body style="margin:0; padding:0; background:transparent; overflow:hidden;">
-            <script>
-            function copyText(text, btn) {{
-                if (navigator.clipboard) {{
-                    navigator.clipboard.writeText(text);
-                }} else {{
-                    var t = document.createElement("textarea");
-                    t.value = text;
-                    document.body.appendChild(t);
-                    t.select();
-                    document.execCommand("Copy");
-                    t.remove();
-                }}
-                btn.innerText = "Copiado!";
-                setTimeout(() => {{ btn.innerText = "Copiar"; }}, 2000);
-            }}
-            </script>
-            <div style="font-family: sans-serif; display: flex; align-items: center; gap: 8px; margin-top:2px; margin-bottom:5px;">
-                <span style="font-size: 13px; font-weight: bold; color: #64748b;">Cód: {cod_base}</span>
-                <button onclick="copyText('{cod_base}', this)" style="border: 1px solid #cbd5e1; background: #f8fafc; cursor: pointer; border-radius: 4px; font-size: 10px; padding: 2px 6px; color: #475569; transition: 0.2s;">Copiar</button>
-            </div>
-            </body></html>
-            """
-            st.components.v1.html(html_copy, height=25)
-            st.write(f"**{prod['Descrição']}**")
+            with c_fi:
+                st.markdown(
+                    "<div style='height: 28px;'></div>", unsafe_allow_html=True)
+                st.write(f"**R$ {prod['Preço Final']:.2f}**")
 
-        with c_pr:
-            st.number_input("", format="%.2f", step=None, key=f"pr_{uid}", on_change=atualizar_valores_uid, args=(
-                i, uid), label_visibility="collapsed")
-
-        with c_co:
-            m_co, i_co, p_co = st.columns(
-                [0.7, 2.0, 0.7], gap="small", vertical_alignment="center")
-            m_co.button("➖", key=f"co_m_{uid}", type="tertiary",
-                        on_click=step_value, args=(uid, 'co_', -1.0))
-            i_co.number_input("", format="%.1f", step=0.1, key=f"co_{uid}", on_change=atualizar_valores_uid, args=(
-                i, uid), label_visibility="collapsed")
-            p_co.button("➕", key=f"co_p_{uid}", type="tertiary",
-                        on_click=step_value, args=(uid, 'co_', 1.0))
-
-        with c_fl:
-            m_fl, i_fl, p_fl = st.columns(
-                [0.7, 2.0, 0.7], gap="small", vertical_alignment="center")
-            m_fl.button("➖", key=f"fl_m_{uid}", type="tertiary",
-                        on_click=step_value, args=(uid, 'fl_', -1.0))
-            i_fl.number_input("", format="%.1f", step=0.1, key=f"fl_{uid}", on_change=atualizar_valores_uid, args=(
-                i, uid), label_visibility="collapsed")
-            p_fl.button("➕", key=f"fl_p_{uid}", type="tertiary",
-                        on_click=step_value, args=(uid, 'fl_', 1.0))
-
-        with c_de:
-            m_de, i_de, p_de = st.columns(
-                [0.7, 2.0, 0.7], gap="small", vertical_alignment="center")
-            m_de.button("➖", key=f"de_m_{uid}", type="tertiary",
-                        on_click=step_value, args=(uid, 'de_', -1.0))
-            i_de.number_input("", format="%.1f", step=0.1, key=f"de_{uid}", on_change=atualizar_valores_uid, args=(
-                i, uid), label_visibility="collapsed")
-            p_de.button("➕", key=f"de_p_{uid}", type="tertiary",
-                        on_click=step_value, args=(uid, 'de_', 1.0))
-
-        with c_im:
-            if prod.get('ST_Flag'):
-                st.markdown("<div style='color:#10b981; font-size:11px; font-weight:800; text-align:center; line-height:1.2; margin-bottom:-5px; padding-top:10px'>com S.T<br>Não Calcular</div>", unsafe_allow_html=True)
-            else:
-                st.markdown("<div style='color:#ef4444; font-size:11px; font-weight:800; text-align:center; line-height:1.2; margin-bottom:-5px; padding-top:10px'>sem S.T<br>CALCULAR</div>", unsafe_allow_html=True)
-            st.checkbox(
-                "+10.1%", key=f"im_{uid}", on_change=atualizar_valores_uid, args=(i, uid))
-
-        with c_fi:
-            st.write(f"**R$ {prod['Preço Final']:.2f}**")
-
-        st.markdown("---")
+            st.markdown("---")
 
 with st.expander("Finalizar e Gerar Artes...", expanded=True):
-    st.markdown("<p class='titulo-secao'>Painel de Geração</p>",
-                unsafe_allow_html=True)
+    st.markdown("""
+    <div style="margin-top:18px;">
+        <h3 style="margin-bottom:4px;">🎨 Finalizar e Gerar Artes</h3>
+        <p style="color:#475569; margin-top:0;">
+            Escolha visualmente o layout pelas miniaturas abaixo antes de gerar ou baixar.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
 
-st.markdown("""
-<div style="margin-top:18px;">
-    <h3 style="margin-bottom:4px;">🎨 Finalizar e Gerar Artes</h3>
-    <p style="color:#475569; margin-top:0;">
-        Escolha visualmente o layout pelas miniaturas abaixo antes de gerar ou baixar.
-    </p>
-</div>
-""", unsafe_allow_html=True)
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    n_layout = st.session_state.get("num_produtos_layout", 0)
 
-base_dir = os.path.dirname(os.path.abspath(__file__))
-n_layout = st.session_state.get("num_produtos_layout", 0)
+    layouts_grade = listar_layouts_grade(base_dir, n_layout) if n_layout != 0 else []
+    layouts_indiv = listar_layouts_individuais(base_dir)
 
-layouts_grade = listar_layouts_grade(base_dir, n_layout) if n_layout != 0 else []
-layouts_indiv = listar_layouts_individuais(base_dir)
+    layout_grade_selecionado = obter_layout_selecionado(layouts_grade, "sel_grade") if layouts_grade else None
+    layout_indiv_selecionado = obter_layout_selecionado(layouts_indiv, "sel_indiv") if layouts_indiv else None
 
-layout_grade_selecionado = obter_layout_selecionado(layouts_grade, "sel_grade") if layouts_grade else None
-layout_indiv_selecionado = obter_layout_selecionado(layouts_indiv, "sel_indiv") if layouts_indiv else None
+    st.markdown("### 🖼️ Escolha os Layouts")
+    prev1, prev2 = st.columns(2)
 
-st.markdown("### 🖼️ Escolha os Layouts")
-prev1, prev2 = st.columns(2)
+    with prev1:
+        texto_layout = "Sem Limite Definido" if n_layout == 0 else f"{n_layout} Espaços"
+        st.markdown(f"#### Tabloide em Grade ({texto_layout})")
 
-with prev1:
-    texto_layout = "Sem Limite Definido" if n_layout == 0 else f"{n_layout} Espaços"
-    st.markdown(f"#### Tabloide em Grade ({texto_layout})")
+        if n_layout == 0:
+            st.info("Para tabloide em grade, selecione antes um layout fixo no menu lateral.")
+        else:
+            renderizar_seletor_layouts(
+                titulo="Modelos disponíveis para Grade",
+                layouts=layouts_grade,
+                session_key="sel_grade",
+                colunas_por_linha=2
+            )
 
-    if n_layout == 0:
-        st.info("Para tabloide em grade, selecione antes um layout fixo no menu lateral.")
-    else:
+    with prev2:
         renderizar_seletor_layouts(
-            titulo="Modelos disponíveis para Grade",
-            layouts=layouts_grade,
-            session_key="sel_grade",
+            titulo="Modelos disponíveis para Artes Individuais",
+            layouts=layouts_indiv,
+            session_key="sel_indiv",
             colunas_por_linha=2
         )
 
-with prev2:
-    renderizar_seletor_layouts(
-        titulo="Modelos disponíveis para Artes Individuais",
-        layouts=layouts_indiv,
-        session_key="sel_indiv",
-        colunas_por_linha=2
-    )
+    st.markdown("---")
+    btn1, btn2, btn3 = st.columns(3)
 
-st.markdown("---")
-btn1, btn2, btn3 = st.columns(3)
-
-with btn1:
-    if st.button("GERAR TABLOIDE (GRADE)", type="primary", use_container_width=True):
-        if n_layout == 0:
-            st.error("Para gerar um tabloide em grade, escolha um layout fixo (9, 12, 16 ou 20) no menu lateral.")
-        elif layout_grade_selecionado is None:
-            st.error("Nenhum layout de grade foi encontrado para este formato.")
-        else:
-            st.session_state["galeria_individuais"] = []
-            st.session_state["pdf_buffer_pronto"] = None
-
-            df_final = pd.DataFrame(st.session_state["produtos_selecionados"])
-            if not df_final.empty:
-                df_final = df_final[df_final["Levar"] == True]
-
-            if df_final.empty:
-                st.error("Você não deixou nenhum item marcado!")
+    with btn1:
+        if st.button("GERAR TABLOIDE (GRADE)", type="primary", use_container_width=True):
+            if n_layout == 0:
+                st.error("Para gerar um tabloide em grade, escolha um layout fixo (9, 12, 16 ou 20) no menu lateral.")
+            elif layout_grade_selecionado is None:
+                st.error("Nenhum layout de grade foi encontrado para este formato.")
             else:
-                fpath_grade = layout_grade_selecionado["path"]
-                alertas = checar_imposto_st(df_final)
+                st.session_state["galeria_individuais"] = []
+                st.session_state["pdf_buffer_pronto"] = None
 
-                if alertas:
-                    st.session_state["confirmacao_st"] = "grade"
-                    st.session_state["alertas_st"] = alertas
-                    st.session_state["df_pendente"] = df_final
-                    st.session_state["path_pendente"] = fpath_grade
+                df_final = pd.DataFrame(st.session_state["produtos_selecionados"])
+                if not df_final.empty:
+                    df_final = df_final[df_final["Levar"] == True]
+
+                if df_final.empty:
+                    st.error("Você não deixou nenhum item marcado!")
                 else:
-                    st.session_state["confirmacao_st"] = None
-                    acionar_gerador_grade(df_final, fpath_grade, n_layout)
+                    fpath_grade = layout_grade_selecionado["path"]
+                    alertas = checar_imposto_st(df_final)
 
-with btn2:
-    if st.button("GERAR ARTES INDIVIDUAIS", type="secondary", use_container_width=True):
-        if layout_indiv_selecionado is None:
-            st.error("Nenhum layout individual foi encontrado.")
-        else:
+                    if alertas:
+                        st.session_state["confirmacao_st"] = "grade"
+                        st.session_state["alertas_st"] = alertas
+                        st.session_state["df_pendente"] = df_final
+                        st.session_state["path_pendente"] = fpath_grade
+                    else:
+                        st.session_state["confirmacao_st"] = None
+                        acionar_gerador_grade(df_final, fpath_grade, n_layout)
+
+    with btn2:
+        if st.button("GERAR ARTES INDIVIDUAIS", type="secondary", use_container_width=True):
+            if layout_indiv_selecionado is None:
+                st.error("Nenhum layout individual foi encontrado.")
+            else:
+                st.session_state["pdf_buffer_pronto"] = None
+
+                df_final = pd.DataFrame(st.session_state["produtos_selecionados"])
+                if not df_final.empty:
+                    df_final = df_final[df_final["Levar"] == True]
+
+                if df_final.empty:
+                    st.error("O painel está vazio ou sem itens marcados!")
+                else:
+                    fpath_indiv = layout_indiv_selecionado["path"]
+                    alertas = checar_imposto_st(df_final)
+
+                    if alertas:
+                        st.session_state["confirmacao_st"] = "indiv"
+                        st.session_state["alertas_st"] = alertas
+                        st.session_state["df_pendente"] = df_final
+                        st.session_state["path_pendente"] = fpath_indiv
+                    else:
+                        st.session_state["confirmacao_st"] = None
+                        st.session_state["galeria_individuais"] = acionar_gerador_individual(df_final, fpath_indiv)
+
+    with btn3:
+        if st.button("GERAR PDF PLANILHA", type="secondary", use_container_width=True):
             st.session_state["pdf_buffer_pronto"] = None
 
             df_final = pd.DataFrame(st.session_state["produtos_selecionados"])
@@ -1985,38 +1714,15 @@ with btn2:
             if df_final.empty:
                 st.error("O painel está vazio ou sem itens marcados!")
             else:
-                fpath_indiv = layout_indiv_selecionado["path"]
                 alertas = checar_imposto_st(df_final)
 
                 if alertas:
-                    st.session_state["confirmacao_st"] = "indiv"
+                    st.session_state["confirmacao_st"] = "pdf"
                     st.session_state["alertas_st"] = alertas
                     st.session_state["df_pendente"] = df_final
-                    st.session_state["path_pendente"] = fpath_indiv
                 else:
                     st.session_state["confirmacao_st"] = None
-                    st.session_state["galeria_individuais"] = acionar_gerador_individual(df_final, fpath_indiv)
-
-with btn3:
-    if st.button("GERAR PDF PLANILHA", type="secondary", use_container_width=True):
-        st.session_state["pdf_buffer_pronto"] = None
-
-        df_final = pd.DataFrame(st.session_state["produtos_selecionados"])
-        if not df_final.empty:
-            df_final = df_final[df_final["Levar"] == True]
-
-        if df_final.empty:
-            st.error("O painel está vazio ou sem itens marcados!")
-        else:
-            alertas = checar_imposto_st(df_final)
-
-            if alertas:
-                st.session_state["confirmacao_st"] = "pdf"
-                st.session_state["alertas_st"] = alertas
-                st.session_state["df_pendente"] = df_final
-            else:
-                st.session_state["confirmacao_st"] = None
-                st.session_state["pdf_buffer_pronto"] = gerar_pdf_planilha(df_final)
+                    st.session_state["pdf_buffer_pronto"] = gerar_pdf_planilha(df_final)
 
     if st.session_state.get("pdf_buffer_pronto") is not None:
         st.success("✅ PDF pronto para download!")
@@ -2027,75 +1733,116 @@ with btn3:
             mime="application/pdf",
             type="primary",
             use_container_width=True
-    )
+        )
 
-        st.markdown(
-                f"<div style='text-align:center; font-weight:bold; color:#1E293B; margin-bottom:8px;'>Layout do Tabloide ({texto_layout})</div>", unsafe_allow_html=True)
-        st.selectbox("Versão Tabloide", [
-                         "Layout 1", "Layout 2", "Layout 3", "Layout 4"], key="sel_grade", label_visibility="collapsed")
+    if st.session_state.get("confirmacao_st"):
+        st.warning("⚠️ **Aviso de ST Pendente:**", icon="🚨")
+        st.markdown("Os seguintes produtos constam como **SEM S.T (Calcular)**, mas a caixa de **Imposto (+10.1%)** não foi marcada:")
+        for a in st.session_state["alertas_st"]:
+            st.markdown(f"- {a}")
 
-        opt_g = st.session_state.get("sel_grade", "Layout 1")
-        num_v_g = opt_g.split()[-1]
+        st.markdown("Deseja continuar a geração mesmo assim?")
 
-        if n_layout != 0:
-                if n_layout == 9:
-                    nome_fundo_grade = f"FUNDO-BASE-USADO-NA-AUTOMACAO-{num_v_g}.jpg"
-                else:
-                    nome_fundo_grade = f"Modelo {n_layout} Espaços-{num_v_g}.jpg"
-                f_path_g = os.path.join(base_dir, nome_fundo_grade)
-                if os.path.exists(f_path_g):
-                    st.image(f_path_g, use_container_width=True)
-                else:
-                    st.warning(
-                        f"⚠️ Imagem '{nome_fundo_grade}' não encontrada.")
+        c_conf1, c_conf2 = st.columns(2)
+        with c_conf1:
+            if st.button("✅ SIM, GERAR MESMO ASSIM", use_container_width=True, type="primary"):
+                df_p = st.session_state["df_pendente"]
+                fpath = st.session_state.get("path_pendente")
+                tipo = st.session_state["confirmacao_st"]
+
+                if tipo == "grade":
+                    acionar_gerador_grade(df_p, fpath, n_layout)
+                elif tipo == "indiv":
+                    st.session_state["galeria_individuais"] = acionar_gerador_individual(df_p, fpath)
+                elif tipo == "pdf":
+                    st.session_state["pdf_buffer_pronto"] = gerar_pdf_planilha(df_p)
+
+                st.session_state["confirmacao_st"] = None
+                st.session_state["alertas_st"] = []
+                st.session_state["df_pendente"] = None
+                st.session_state["path_pendente"] = None
+                st.rerun()
+
+        with c_conf2:
+            if st.button("❌ NÃO, CANCELAR E VOLTAR", use_container_width=True):
+                st.session_state["confirmacao_st"] = None
+                st.session_state["alertas_st"] = []
+                st.session_state["df_pendente"] = None
+                st.session_state["path_pendente"] = None
+                st.rerun()
+
+
+    if st.session_state.get("galeria_individuais"):
+        st.markdown(f"\n🖼️ Galeria de Artes Geradas\n\n")
+
+        # Filtro de busca na galeria
+        busca_galeria = st.text_input("🔍 Buscar na galeria (Código ou Descrição):", "")
+        
+        imagens_filtradas = []
+        for img_info in st.session_state["galeria_individuais"]:
+            if busca_galeria.lower() in img_info["nome"].lower() or busca_galeria.lower() in img_info["desc"].lower():
+                imagens_filtradas.append(img_info)
+
+        if not imagens_filtradas:
+            st.warning("Nenhuma arte encontrada com este termo.")
         else:
-                st.info("⚠️ Sem limite não gera tabloide em grade.")
+            # Layout em colunas dinâmicas (4 por linha)
+            colunas_por_linha = 4
+            linhas = [imagens_filtradas[i:i + colunas_por_linha] for i in range(0, len(imagens_filtradas), colunas_por_linha)]
+            
+            for linha in linhas:
+                cols = st.columns(colunas_por_linha)
+                for i, img_info in enumerate(linha):
+                    with cols[i]:
+                        # Criar card com CSS customizado
+                        st.markdown(f"""
+                            <div style="
+                                border: 1px solid #e2e8f0; 
+                                border-radius: 8px; 
+                                padding: 8px; 
+                                margin-bottom: 15px;
+                                background-color: white;
+                                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                            ">
+                                <div style="font-size: 0.8rem; font-weight: bold; color: #1e293b; margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="{img_info['desc']}">
+                                    {img_info['desc']}
+                                </div>
+                        """, unsafe_allow_html=True)
+                        
+                        st.image(img_info["path"], use_container_width=True)
+                        
+                        # Botão de download padrão do Streamlit
+                        with open(img_info["path"], "rb") as f:
+                            st.download_button(
+                                label="⬇️ Baixar",
+                                data=f,
+                                file_name=img_info["nome"],
+                                mime="image/jpeg",
+                                key=f"dl_{img_info['nome']}",
+                                use_container_width=True
+                            )
+                        st.markdown("</div>", unsafe_allow_html=True)
 
-        with c_prev2:
-            st.markdown(
-                "<div style='text-align:center; font-weight:bold; color:#1E293B; margin-bottom:8px;'>Arte Individual</div>", unsafe_allow_html=True)
-            st.selectbox("Versão Individual", [
-                         "Layout 1", "Layout 2", "Layout 3", "Layout 4"], key="sel_indiv", label_visibility="collapsed")
-
-            opt_i = st.session_state.get("sel_indiv", "Layout 1")
-            num_v_i = opt_i.split()[-1]
-            f_path_i = obter_template_individual(base_dir, num_v_i)
-
-            if os.path.exists(f_path_i):
-                st.image(f_path_i, use_container_width=True)
-            else:
-                st.warning(
-                    f"⚠️ Imagem do layout individual {num_v_i} não encontrada.")
-
-        with c_prev3:
-            st.markdown("""
-            <div style='text-align:center; font-weight:bold; color:#1E293B; margin-bottom:8px;'>
-                PDF Planilha
-            </div>
-            <div style='background-color: #ecfeff; border: 2px dashed #06b6d4; border-radius: 8px; height: 180px;
-                        display: flex; align-items: center; justify-content: center; flex-direction: column;'>
-                <span style='font-size: 40px;'>📄</span>
-                <span style='color: #0f172a; font-weight: bold; margin-top: 10px;'>PDF Interativo</span>
-                <span style='color: #475569; font-size: 12px; margin-top: 6px;'>Com checkboxes e quantidade</span>
-            </div>
-            """, unsafe_allow_html=True)
-
-    if len(st.session_state.get('galeria_individuais', [])) > 0:
-        st.markdown(
-            "<p class='titulo-secao'>🖼️ Galeria de Artes Geradas</p>", unsafe_allow_html=True)
-        colunas = st.columns(3)
-        for index, item in enumerate(st.session_state['galeria_individuais']):
-            with colunas[index % 3]:
-                st.image(item["path"], use_container_width=True)
-                with open(item["path"], "rb") as file:
-                    st.download_button(label="⬇️ Baixar Imagem", data=file,
-                                       file_name=item["nome"], mime="image/jpeg", key=f"dl_btn_galeria_{item['nome']}", use_container_width=True)
-
-with tab2:
-    st.header("🤖 Decifrador de Sistema")
-    texto_bruto = st.text_area(
-        "Bloco de Texto:", height=200, placeholder="Ex: 05011897LIMP VD VIDREX TRAD...")
-    if st.button("Decifrar com IA"):
-        with st.spinner("Conectando..."):
-            time.sleep(2)
-            st.success("Interpretado!")
+        # Botão para baixar tudo em ZIP
+        if len(imagens_filtradas) > 1:
+            st.markdown("---")
+            import zipfile
+            
+            zip_buffer = BytesIO()
+            with zipfile.ZipFile(zip_buffer, "w") as zf:
+                for img_info in imagens_filtradas:
+                    if os.path.exists(img_info["path"]):
+                        zf.write(img_info["path"], arcname=img_info["nome"])
+            
+            zip_buffer.seek(0)
+            
+            col_zip, _, _ = st.columns([2, 1, 1])
+            with col_zip:
+                st.download_button(
+                    label=f"📦 BAIXAR TODAS AS {len(imagens_filtradas)} ARTES EM ZIP",
+                    data=zip_buffer,
+                    file_name=f"artes_destro_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip",
+                    mime="application/zip",
+                    type="primary",
+                    use_container_width=True
+                )
