@@ -65,26 +65,70 @@ if st.session_state.get("_app_version") != APP_VERSION:
 # ==========================================
 st.markdown("""
     <style>
-    .main { background-color: #f4f6f9; }
+    :root {
+        --crm-primary: #dc2626;
+        --crm-primary-dark: #b91c1c;
+        --crm-secondary: #2563eb;
+        --crm-success: #16a34a;
+        --crm-warning: #d97706;
+        --crm-danger: #dc2626;
+        --crm-bg: #f8fafc;
+        --crm-card: #ffffff;
+        --crm-border: #dbe3ef;
+        --crm-text: #0f172a;
+        --crm-muted: #475569;
+        --crm-radius: 12px;
+    }
+    .main { background-color: var(--crm-bg); }
+    .block-container { padding-top: 1.2rem; }
+
+    .crm-hero {
+        display: flex; justify-content: space-between; align-items: stretch;
+        gap: 16px; background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 65%, #dc2626 130%);
+        border-radius: 16px; padding: 18px 20px; margin-bottom: 12px;
+        box-shadow: 0 10px 30px rgba(15,23,42,0.2);
+    }
+    .crm-hero-left h1 { margin: 0; color: white; font-size: 28px; font-weight: 900; }
+    .crm-hero-left p { margin: 8px 0 0 0; color: #dbeafe; font-size: 14px; max-width: 760px; }
+    .crm-badge {
+        display:inline-block; background:#fee2e2; color:#991b1b; border:1px solid #fecaca;
+        border-radius:999px; padding:4px 10px; font-size:11px; font-weight:800; margin-bottom:8px;
+    }
+    .crm-mini-card {
+        background: rgba(255,255,255,0.14); border: 1px solid rgba(255,255,255,0.2);
+        border-radius: 12px; padding: 12px; min-width: 240px;
+    }
+    .crm-mini-title { color: #e2e8f0; font-weight: 800; font-size: 12px; margin-bottom: 8px; }
+    .crm-mini-item { color: #f8fafc; font-size: 12px; margin: 2px 0; }
+
+    .crm-step {
+        border: 1px solid var(--crm-border); background: var(--crm-card);
+        border-radius: var(--crm-radius); padding: 10px 12px; margin: 10px 0 12px 0;
+        box-shadow: 0 2px 8px rgba(15,23,42,0.05);
+    }
+    .crm-step-title { font-size: 15px; font-weight: 800; color: var(--crm-text); }
+    .crm-step-subtitle { font-size: 12px; color: var(--crm-muted); margin-top: 4px; }
+
     div.stButton > button[kind="primary"] { 
-        background-color: #ff4b4b; color: white; width: 100%; 
-        border-radius: 8px; height: 3.5em; font-weight: bold; font-size: 16px; 
+        background-color: var(--crm-primary); color: white; width: 100%; 
+        border-radius: 10px; height: 3.2em; font-weight: 800; font-size: 15px; border: none;
     }
-    div.stButton > button[kind="primary"]:hover { box-shadow: 0px 4px 10px rgba(255, 75, 75, 0.4); }
+    div.stButton > button[kind="primary"]:hover { background-color: var(--crm-primary-dark); box-shadow: 0px 8px 16px rgba(220, 38, 38, 0.25); }
     div.stButton > button[kind="secondary"] { 
-        background-color: #007BFF; color: white; width: 100%; 
-        border-radius: 8px; height: 3.5em; font-weight: bold; font-size: 16px; border: none;
+        background-color: var(--crm-secondary); color: white; width: 100%; 
+        border-radius: 10px; height: 3.2em; font-weight: 700; font-size: 15px; border: none;
     }
-    div.stButton > button[kind="secondary"]:hover { background-color: #0056b3; box-shadow: 0px 4px 10px rgba(0, 123, 255, 0.4); }
+    div.stButton > button[kind="secondary"]:hover { background-color: #1d4ed8; box-shadow: 0px 8px 16px rgba(37, 99, 235, 0.24); }
     div.stButton > button[kind="tertiary"] { 
         background-color: transparent !important; color: #475569 !important; width: 100%; 
         border-radius: 8px; height: 3.5em; font-weight: bold; font-size: 16px; border: none !important;
         box-shadow: none !important; outline: none !important; padding: 0 !important;
     }
     div.stButton > button[kind="tertiary"]:hover { background-color: #e2e8f0 !important; }
-    .titulo-secao { font-size: 26px !important; font-weight: 800 !important; color: #1E293B; text-align: center; margin-bottom: 10px; }
-    .subtitulo { font-size: 18px !important; font-weight: 700 !important; color: #334155; }
+    .titulo-secao { font-size: 24px !important; font-weight: 900 !important; color: #1E293B; text-align: center; margin-bottom: 8px; }
+    .subtitulo { font-size: 17px !important; font-weight: 800 !important; color: #334155; }
     div[data-testid="stHorizontalBlock"] { align-items: center; }
+    div[data-testid="stAlert"] { border-radius: 10px; border: 1px solid var(--crm-border); }
     </style>
     """, unsafe_allow_html=True)
 
@@ -110,6 +154,49 @@ if 'path_pendente' not in st.session_state:
     st.session_state['path_pendente'] = None
 if 'pdf_buffer_pronto' not in st.session_state:
     st.session_state['pdf_buffer_pronto'] = None
+
+UI_TEXT = {
+    "app_name": "CRM Destro - RCA",
+    "app_subtitle": "Plataforma comercial para montagem de tabloides, artes e PDFs com fluxo operacional guiado.",
+    "step_context": "1) Contexto e filtros",
+    "step_selection": "2) Seleção e ajustes dos produtos",
+    "step_generation": "3) Geração e download dos materiais",
+    "section_filters": "Filtros e contexto comercial",
+    "section_manual": "Seleção manual de produtos",
+    "section_generation": "Finalização e geração",
+}
+
+
+def render_app_header():
+    st.markdown(f"""
+    <div class="crm-hero">
+        <div class="crm-hero-left">
+            <div class="crm-badge">Operação Destro</div>
+            <h1>{UI_TEXT["app_name"]}</h1>
+            <p>{UI_TEXT["app_subtitle"]}</p>
+        </div>
+        <div class="crm-hero-right">
+            <div class="crm-mini-card">
+                <div class="crm-mini-title">Fluxo recomendado</div>
+                <div class="crm-mini-item">• Ajuste filtros e prazo</div>
+                <div class="crm-mini-item">• Monte os produtos</div>
+                <div class="crm-mini-item">• Gere e baixe os materiais</div>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+
+def render_step_block(title, subtitle=""):
+    st.markdown(
+        f"""
+        <div class="crm-step">
+            <div class="crm-step-title">{title}</div>
+            <div class="crm-step-subtitle">{subtitle}</div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
 
 def has_operation_permission(action: str) -> bool:
@@ -1694,6 +1781,12 @@ with st.sidebar:
 tab1, tab2 = st.tabs(["📊 Montagem do Tabloide", "🤖 IA Limpador"])
 
 with tab1:
+    render_app_header()
+    render_step_block(
+        UI_TEXT["step_context"],
+        "Defina prazo, campanhas e filtros em cascata para reduzir ruído na seleção."
+    )
+
     if not df_app.empty:
         df_baixou = df_app[df_app['Status'].str.contains("Baixou")]
         top_10 = df_baixou.nlargest(10, 'Desconto %')
@@ -1773,6 +1866,10 @@ with tab1:
                     f"⚠️ {len(faltantes)} produto(s) da Curva ABC não foram encontrados na aba Banco_Dados_Semanal.")
 
     st.markdown("---")
+    render_step_block(
+        UI_TEXT["step_selection"],
+        "Monte o painel final, ajuste preço/comissão/flex/desconto e valide imposto antes de gerar."
+    )
     st.markdown("<p class='titulo-secao'>Selecionar Produtos Manualmente</p>",
                 unsafe_allow_html=True)
 
@@ -1885,6 +1982,7 @@ with tab1:
             with b4:
                 if st.button("❌", key=f"del_{uid}", type="tertiary"):
                     deletar_item(i)
+            st.caption("Ações rápidas: marcar, reordenar, remover e atualizar imagem.")
 
             # Segunda linha de ações (Trocar/Subir imagem)
             if caminho_img and os.path.exists(caminho_img):
@@ -1992,6 +2090,10 @@ with tab1:
         st.markdown("---")
 
 with st.expander("Finalizar e Gerar Artes...", expanded=True):
+    render_step_block(
+        UI_TEXT["step_generation"],
+        "Escolha o tipo de saída, confirme alertas de imposto e faça os downloads finais."
+    )
     st.markdown("<p class='titulo-secao'>Painel de Geração</p>",
                 unsafe_allow_html=True)
 
@@ -2025,6 +2127,7 @@ with st.expander("Finalizar e Gerar Artes...", expanded=True):
                 if df_final.empty:
                     st.error("Você não deixou nenhum item marcado!")
                 else:
+                    st.info("Gerando tabloide: esta operação pode levar alguns segundos dependendo da quantidade de imagens.")
                     padrao_fundo = LAYOUTS.get(n_layout, LAYOUTS[9])[
                         "bg_pattern"]
 
@@ -2061,6 +2164,7 @@ with st.expander("Finalizar e Gerar Artes...", expanded=True):
             if df_final.empty:
                 st.error("O painel está vazio ou sem itens marcados!")
             else:
+                st.info("Gerando artes individuais: o tempo depende do total de produtos selecionados.")
                 alertas = checar_imposto_st(df_final)
                 if alertas:
                     st.session_state["confirmacao_st"] = "indiv"
@@ -2087,6 +2191,7 @@ with st.expander("Finalizar e Gerar Artes...", expanded=True):
             if df_final.empty:
                 st.error("O painel está vazio ou sem itens marcados!")
             else:
+                st.info("Gerando PDF: aguarde até a disponibilização do botão de download.")
                 alertas = checar_imposto_st(df_final)
                 if alertas:
                     st.session_state["confirmacao_st"] = "pdf"
