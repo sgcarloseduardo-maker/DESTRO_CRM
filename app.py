@@ -175,6 +175,111 @@ def processar_busca():
     st.session_state["busca_temp"] = None
 
 
+def mover_cima(index):
+    if index > 0:
+        lista = st.session_state['produtos_selecionados']
+        lista[index], lista[index-1] = lista[index-1], lista[index]
+
+
+def mover_baixo(index):
+    lista = st.session_state['produtos_selecionados']
+    if index < len(lista) - 1:
+        lista[index], lista[index+1] = lista[index+1], lista[index]
+
+
+def deletar_item(index):
+    st.session_state['produtos_selecionados'].pop(index)
+
+
+def atualizar_valores_uid(index=None, u_id=None):
+    if index is None and u_id is not None:
+        index = next((idx for idx, p in enumerate(
+            st.session_state['produtos_selecionados']) if p['Código'] == u_id), None)
+    if index is not None:
+        prod = st.session_state['produtos_selecionados'][index]
+        pr_val = st.session_state.get(
+            f"pr_{u_id}", prod.get('Preço Atual', 0.0))
+        co_val = st.session_state.get(f"co_{u_id}", prod.get('Comissão', 0.0))
+        fl_val = st.session_state.get(f"fl_{u_id}", prod.get('FLEX', 0.0))
+        de_val = st.session_state.get(f"de_{u_id}", prod.get('DESC', 0.0))
+        im_val = st.session_state.get(f"im_{u_id}", prod.get('Imposto', False))
+        prod['Preço Atual'] = float(pr_val if pr_val is not None else 0.0)
+        prod['Comissão'] = float(co_val if co_val is not None else 0.0)
+        prod['FLEX'] = float(fl_val if fl_val is not None else 0.0)
+        prod['DESC'] = float(de_val if de_val is not None else 0.0)
+        prod['Imposto'] = bool(im_val)
+        calc = prod['Preço Atual'] * (1 + (prod['Comissão'] / 100.0))
+        calc = calc * (1 + (prod['FLEX'] / 100.0))
+        calc = calc * (1 - (prod['DESC'] / 100.0))
+        if prod['Imposto']:
+            calc = calc * 1.101
+        prod['Preço Final'] = round(calc, 2)
+
+
+def step_value(u_id, prefix, delta):
+    key = f"{prefix}_{u_id}"
+    current_val = st.session_state.get(key, 0.0)
+    st.session_state[key] = round(
+        (current_val if current_val is not None else 0.0) + delta, 1)
+    atualizar_valores_uid(u_id=u_id)
+
+
+def checar_imposto_st(df):
+    alertas = []
+    for _, row in df.iterrows():
+        if str(row.get('ST_Flag', '')).strip() == '*' and not bool(row.get('Imposto', False)):
+            alertas.append(row['Descrição'])
+    return alertas
+
+
+def add_auto_products(df_subset, max_items):
+    added = 0
+    for _, row in df_subset.iterrows():
+        if max_items > 0 and added >= max_items:
+            break
+        cod = row['Código']
+        if not any(d['Código'] == cod for d in st.session_state['produtos_selecionados']):
+            st.session_state['produtos_selecionados'].append({
+                'Levar': True,
+                'Código': cod,
+                'Status': row['Status'],
+                'Descrição': row['Descrição'],
+                'Preço Atual': float(row['Preço Atual']),
+                'Comissão': 0.0,
+                'FLEX': 0.0,
+                'DESC': 0.0,
+                'Imposto': False,
+                'Preço Final': float(row['Preço Atual']),
+                'ST_Flag': row.get('ST_Flag', '')
+            })
+            added += 1
+
+
+def normalizar_codigo_imagem(codigo: str) -> str:
+    if not codigo:
+        return ""
+    s = str(codigo).split("-")[0]
+    return re.sub(r"\D", "", s)
+
+
+@st.cache_data
+def obter_indice_imagens():
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    pasta_imagens = os.path.join(base_dir, "Base de Imagens")
+    idx = {}
+    if not os.path.exists(pasta_imagens):
+        return idx
+    for root, _, files in os.walk(pasta_imagens):
+        for fn in files:
+            ext = os.path.splitext(fn)[1].lower()
+            if ext in (".jpg", ".jpeg", ".png", ".webp"):
+                base = os.path.splitext(fn)[0]
+                num = re.sub(r"\D", "", base)
+                if num:
+                    idx[num] = os.path.join(root, fn)
+    return idx
+
+
 def salvar_imagem_upload(uploaded_file, codigo_produto):
     if uploaded_file is None:
         return False
@@ -202,6 +307,7 @@ def salvar_imagem_upload(uploaded_file, codigo_produto):
 
     st.cache_data.clear()
     return True
+
 
 
 
