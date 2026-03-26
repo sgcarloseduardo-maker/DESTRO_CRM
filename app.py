@@ -30,6 +30,7 @@ st.set_page_config(
 )
 APP_VERSION = "2026.03.26.01"
 
+
 def forcar_refresh_app(limpar_sessao=True):
     st.cache_data.clear()
     st.cache_resource.clear()
@@ -40,6 +41,7 @@ def forcar_refresh_app(limpar_sessao=True):
                 del st.session_state[chave]
 
     st.session_state["_app_version"] = APP_VERSION
+
 
 if st.session_state.get("_app_version") != APP_VERSION:
     forcar_refresh_app(limpar_sessao=True)
@@ -1426,7 +1428,8 @@ with st.sidebar:
     opcoes_layout = {0: "Sem Limite", 9: "9 Espaços", 12: "12 Espaços",
                      16: "16 Espaços", 20: "20 Espaços"}
     if "layout_selector_dinamico" not in st.session_state:
-        st.session_state["layout_selector_dinamico"] = st.session_state.get("num_produtos_layout", 0)
+        st.session_state["layout_selector_dinamico"] = st.session_state.get(
+            "num_produtos_layout", 0)
 
     layout_selecionado = st.segmented_control(
         "Escolha o formato:",
@@ -1683,7 +1686,8 @@ with tab1:
             st.cache_resource.clear()
             st.rerun()
 
-    txt_limite = "Sem limite" if num_produtos == 0 else f"{num_produtos} espaços"
+    num_produtos_atual = st.session_state.get("num_produtos_layout", 0)
+    txt_limite = "Sem limite" if num_produtos_atual == 0 else f"{num_produtos_atual} espaços"
     st.markdown(
         f"**Itens no painel:** {len(st.session_state['produtos_selecionados'])} / {txt_limite}")
     st.markdown("---")
