@@ -7,6 +7,8 @@ import os
 import glob
 import base64
 import urllib.parse
+import logging
+import hashlib
 from datetime import datetime
 from PIL import Image, ImageDraw, ImageFont
 from reportlab.lib.pagesizes import letter, landscape
@@ -29,6 +31,13 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 APP_VERSION = "2026.03.26.01"
+
+logger = logging.getLogger(__name__)
+if not logger.handlers:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s | %(levelname)s | %(name)s | %(message)s"
+    )
 
 
 def forcar_refresh_app(limpar_sessao=True):
@@ -276,8 +285,8 @@ def image_to_base64(img_path):
         try:
             with open(img_path, "rb") as image_file:
                 return base64.b64encode(image_file.read()).decode('utf-8')
-        except:
-            pass
+        except OSError as exc:
+            logger.warning("Falha ao converter imagem para base64 (%s): %s", img_path, exc)
     return ""
 
 
@@ -299,7 +308,7 @@ def carregar_fonte(caminho, tamanho):
         if caminho and os.path.exists(caminho):
             return ImageFont.truetype(caminho, tamanho)
     except Exception:
-        pass
+        logger.warning("Falha ao carregar fonte (%s). Usando fonte padrão.", caminho)
     return ImageFont.load_default()
 
 
@@ -332,7 +341,7 @@ def desenhar_placeholder(bg_img, x1, y1, x2, y2):
         box = draw.multiline_textbbox(
             (0, 0), texto, font=fonte, align="center")
         w, h = box[2] - box[0], box[3] - box[1]
-    except:
+    except Exception:
         w, h = 150, 60
 
     pad = 10
@@ -410,7 +419,7 @@ def desenhar_texto_box_grade(draw, texto, x_ini, x_fim, y_ini, y_fim, fonte_path
             teste = (linha_atual + " " + p).strip()
             try:
                 w = draw.textlength(teste, font=fonte)
-            except:
+            except Exception:
                 w = draw.textbbox((0, 0), teste, font=fonte)[2]
             if w <= largura:
                 linha_atual = teste
@@ -424,7 +433,7 @@ def desenhar_texto_box_grade(draw, texto, x_ini, x_fim, y_ini, y_fim, fonte_path
         try:
             h_line = draw.textbbox((0, 0), "A", font=fonte)[
                 3] - draw.textbbox((0, 0), "A", font=fonte)[1]
-        except:
+        except Exception:
             h_line = tamanho
 
         total_h = len(linhas[:3]) * (h_line + 4)
@@ -436,7 +445,7 @@ def desenhar_texto_box_grade(draw, texto, x_ini, x_fim, y_ini, y_fim, fonte_path
     try:
         h_line = draw.textbbox((0, 0), "A", font=fonte)[
             3] - draw.textbbox((0, 0), "A", font=fonte)[1]
-    except:
+    except Exception:
         h_line = tamanho
 
     linhas = linhas[:3]
@@ -446,11 +455,11 @@ def desenhar_texto_box_grade(draw, texto, x_ini, x_fim, y_ini, y_fim, fonte_path
     for l in linhas:
         try:
             w = draw.textlength(l, font=fonte)
-        except:
+        except Exception:
             w = draw.textbbox((0, 0), l, font=fonte)[2]
         try:
             offset_y = draw.textbbox((0, 0), l, font=fonte)[1]
-        except:
+        except Exception:
             offset_y = 0
 
         draw.text((cx - w // 2, cur_y - offset_y), l, fill="black", font=fonte)
@@ -475,7 +484,7 @@ def desenhar_preco_box_grade(draw, preco, x_ini, x_fim, y_ini, y_fim, fonte_path
         try:
             box = draw.textbbox((0, 0), texto, font=fonte)
             w, h = box[2] - box[0], box[3] - box[1]
-        except:
+        except Exception:
             w, h = draw.textsize(texto, font=fonte)
         if w <= (w_box - 4) and h <= (h_box + 4):
             break
@@ -486,7 +495,7 @@ def desenhar_preco_box_grade(draw, preco, x_ini, x_fim, y_ini, y_fim, fonte_path
         box = draw.textbbox((0, 0), texto, font=fonte)
         w, h = box[2] - box[0], box[3] - box[1]
         offset_y = box[1]
-    except:
+    except Exception:
         w, h = draw.textsize(texto, font=fonte)
         offset_y = 0
 
@@ -515,7 +524,8 @@ def colar_imagem_grade(bg, img_path, x_ini, x_fim, y_ini, y_fim, fator_x, fator_
         wi, hi = prod.size
         bg.paste(prod, (cx - wi // 2, cy - hi // 2), prod)
         return True
-    except:
+    except (OSError, ValueError) as exc:
+        logger.warning("Falha ao colar imagem no layout (%s): %s", img_path, exc)
         desenhar_placeholder(bg, x1, y1, x2, y2)
         return False
 
@@ -1046,6 +1056,25 @@ def manter_categoria_completa(txt):
     return s
 
 
+def deterministic_index_from_key(key: str, size: int) -> int:
+    if size <= 0:
+        return 0
+    digest = hashlib.sha256(str(key).encode("utf-8")).hexdigest()
+    return int(digest[:8], 16) % size
+
+
+def deterministic_fator_anterior(key: str) -> float:
+    digest = hashlib.sha256(str(key).encode("utf-8")).hexdigest()
+    bucket = int(digest[8:10], 16) % 100
+    if bucket < 50:
+        return 1.0
+    if bucket < 70:
+        return 1.05
+    if bucket < 80:
+        return 1.15
+    return 0.95
+
+
 @st.cache_data
 def carregar_dados():
     base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -1080,7 +1109,7 @@ def carregar_dados():
         else:
             curva_abc_codigos = []
     except Exception as e:
-        print(f"Erro ao ler Curva ABC: {e}")
+        logger.exception("Erro ao ler aba Curva ABC da planilha: %s", e)
         curva_abc_codigos = []
 
     try:
@@ -1152,8 +1181,23 @@ def carregar_dados():
             lambda x: re.sub(r'\s+', ' ', str(x).strip().upper()))
         df['Camp_Bateu'] = df['Desc_Norm'].isin(descricoes_bateu)
 
-        df['Indústria'] = df['Desc_Norm'].map(dict_bateu_ind).fillna(pd.Series(np.random.choice(
-            lista_industrias, size=len(df)) if lista_industrias else 'Sem Indústria', index=df.index))
+        if lista_industrias:
+            industria_fallback = pd.Series(
+                df.apply(
+                    lambda row: lista_industrias[
+                        deterministic_index_from_key(
+                            f"{row.get('Código', '')}|{row.get('Desc_Norm', '')}",
+                            len(lista_industrias)
+                        )
+                    ],
+                    axis=1
+                ),
+                index=df.index
+            )
+        else:
+            industria_fallback = pd.Series('Sem Indústria', index=df.index)
+
+        df['Indústria'] = df['Desc_Norm'].map(dict_bateu_ind).fillna(industria_fallback)
         df['Marca_BL'] = df['Desc_Norm'].map(dict_bateu_mar)
         mask_missing = df['Marca_BL'].isna() | (df['Marca_BL'] == '')
         df['Marca'] = df['Marca_BL']
@@ -1161,9 +1205,12 @@ def carregar_dados():
             df.loc[mask_missing, 'Marca'] = df.loc[mask_missing,
                                                    'Desc_Norm'].apply(achar_marca)
 
-        np.random.seed(42)
-        df['Fator_Anterior'] = np.random.choice(
-            [1.0, 1.05, 1.15, 0.95], size=len(df), p=[0.5, 0.2, 0.1, 0.2])
+        df['Fator_Anterior'] = df.apply(
+            lambda row: deterministic_fator_anterior(
+                f"{row.get('Código', '')}|{row.get('Desc_Norm', '')}"
+            ),
+            axis=1
+        )
 
         curva_abc_set = set(curva_abc_codigos)
 
@@ -1292,6 +1339,7 @@ def carregar_dados():
             df['Camp_Colgate'] = df['Desc_Norm'].apply(fallback_colgate)
 
     except Exception as e:
+        logger.exception("Erro ao carregar dados da planilha: %s", e)
         st.error(f"Erro ao carregar Excel: {e}")
         df = pd.DataFrame()
 
@@ -1412,6 +1460,7 @@ with st.sidebar:
                 st.error(
                     "Biblioteca não instalada. Feche o app e execute: pip install pdfplumber")
             except Exception as e:
+                logger.exception("Erro ao processar PDF de pedido: %s", e)
                 st.error(f"Erro ao ler PDF: {e}")
 
     st.divider()
@@ -2006,18 +2055,19 @@ with st.expander("Finalizar e Gerar Artes...", expanded=True):
             if st.button("❌ NÃO, CANCELAR E ARRUMAR", type="secondary", use_container_width=True):
                 st.session_state["confirmacao_st"] = None
                 st.rerun()
+
     # --- INÍCIO DO BLOCO DE DOWNLOAD DO PDF ---
-            if st.session_state.get('pdf_buffer_pronto') is not None:
-                st.markdown("<hr style='margin: 15px 0;'>",
-                            unsafe_allow_html=True)
-                st.download_button(
-                    label="⬇️ BAIXAR PDF GERADO",
-                    data=st.session_state['pdf_buffer_pronto'],
-                    file_name=f"produtos_planilha_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
-                    mime="application/pdf",
-                    type="primary",
-                    use_container_width=True
-                )
+    if st.session_state.get('pdf_buffer_pronto') is not None:
+        st.markdown("<hr style='margin: 15px 0;'>",
+                    unsafe_allow_html=True)
+        st.download_button(
+            label="⬇️ BAIXAR PDF GERADO",
+            data=st.session_state['pdf_buffer_pronto'],
+            file_name=f"produtos_planilha_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
+            mime="application/pdf",
+            type="primary",
+            use_container_width=True
+        )
     # --- FIM DO BLOCO DE DOWNLOAD DO PDF ---
 
         st.markdown(
