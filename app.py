@@ -33,176 +33,224 @@ st.set_page_config(
 # CSS CUSTOMIZADO
 # ==========================================
 st.markdown("""
-<style>
-    .block-container {
-        padding-top: 1rem;
-        padding-bottom: 2rem;
+    <style>
+    .main { background-color: #f4f6f9; }
+    div.stButton > button[kind="primary"] { 
+        background-color: #ff4b4b; color: white; width: 100%; 
+        border-radius: 8px; height: 3.5em; font-weight: bold; font-size: 16px; 
     }
-
-    div[data-testid="stFileUploaderDropzoneInstructions"] > div {
-        display: none !important;
+    div.stButton > button[kind="primary"]:hover { box-shadow: 0px 4px 10px rgba(255, 75, 75, 0.4); }
+    div.stButton > button[kind="secondary"] { 
+        background-color: #007BFF; color: white; width: 100%; 
+        border-radius: 8px; height: 3.5em; font-weight: bold; font-size: 16px; border: none;
     }
-
-    div[data-testid="stFileUploaderDropzoneInstructions"]::before {
-        content: "Arraste a imagem aqui ou clique para selecionar";
-        display: block;
-        color: #334155;
-        font-size: 0.95rem;
-        text-align: center;
-        margin-bottom: 0.25rem;
+    div.stButton > button[kind="secondary"]:hover { background-color: #0056b3; box-shadow: 0px 4px 10px rgba(0, 123, 255, 0.4); }
+    div.stButton > button[kind="tertiary"] { 
+        background-color: transparent !important; color: #475569 !important; width: 100%; 
+        border-radius: 8px; height: 3.5em; font-weight: bold; font-size: 16px; border: none !important;
+        box-shadow: none !important; outline: none !important; padding: 0 !important;
     }
-
-    div[data-testid="stFileUploaderDropzone"] small {
-        display: none !important;
-    }
-
-    .layout-card {
-        border: 1px solid #e5e7eb;
-        border-radius: 14px;
-        padding: 10px;
-        background: #ffffff;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.04);
-        margin-bottom: 10px;
-    }
-
-    .layout-card-selected {
-        border: 2px solid #16a34a !important;
-        box-shadow: 0 0 0 3px rgba(22,163,74,0.12);
-    }
-
-    .layout-card-title {
-        font-weight: 700;
-        text-align: center;
-        margin: 6px 0 10px 0;
-        color: #0f172a;
-    }
-
-    .layout-badge {
-        display: inline-block;
-        padding: 4px 10px;
-        border-radius: 999px;
-        font-size: 0.78rem;
-        font-weight: 700;
-        margin-top: 6px;
-        background: #e2e8f0;
-        color: #0f172a;
-    }
-
-    .layout-badge.selected {
-        background: #dcfce7;
-        color: #166534;
-    }
-</style>
-""", unsafe_allow_html=True)
+    div.stButton > button[kind="tertiary"]:hover { background-color: #e2e8f0 !important; }
+    .titulo-secao { font-size: 26px !important; font-weight: 800 !important; color: #1E293B; text-align: center; margin-bottom: 10px; }
+    .subtitulo { font-size: 18px !important; font-weight: 700 !important; color: #334155; }
+    div[data-testid="stHorizontalBlock"] { align-items: center; }
+    </style>
+    """, unsafe_allow_html=True)
 
 # ==========================================
 # VARIÁVEIS DE SESSÃO E FUNÇÕES
 # ==========================================
 if 'produtos_selecionados' not in st.session_state:
     st.session_state['produtos_selecionados'] = []
-
 if 'busca_temp' not in st.session_state:
     st.session_state.busca_temp = None
-
 if 'num_produtos_layout' not in st.session_state:
     st.session_state['num_produtos_layout'] = 0
-
 if 'galeria_individuais' not in st.session_state:
     st.session_state['galeria_individuais'] = []
 
 if 'confirmacao_st' not in st.session_state:
     st.session_state['confirmacao_st'] = None
-
 if 'alertas_st' not in st.session_state:
     st.session_state['alertas_st'] = []
-
 if 'df_pendente' not in st.session_state:
     st.session_state['df_pendente'] = None
-
 if 'path_pendente' not in st.session_state:
     st.session_state['path_pendente'] = None
-
 if 'pdf_buffer_pronto' not in st.session_state:
     st.session_state['pdf_buffer_pronto'] = None
-
-if 'sel_grade' not in st.session_state:
-    st.session_state['sel_grade'] = None
-
-if 'sel_indiv' not in st.session_state:
-    st.session_state['sel_indiv'] = None
-
 
 
 def processar_busca():
     item_escolhido = st.session_state.get("busca_temp")
     df_base = st.session_state.get("df_filtrado_atual", pd.DataFrame())
 
-    if not item_escolhido or df_base.empty:
-        return
-
-    limite = st.session_state.get("num_produtos_layout", 0)
-    if limite > 0 and len(st.session_state["produtos_selecionados"]) >= limite:
-        st.toast(
-            f"🚨 Limite máximo atingido! O layout atual só permite {limite} itens.",
-            icon="⚠️"
-        )
-        st.session_state["busca_temp"] = None
-        return
-
-    raw_cod = item_escolhido.split(" | ")[0]
-    cod = raw_cod.replace("🔴 [JÁ ADICIONADO] ", "").strip()
-
-    df_match = df_base[df_base["Código"] == cod]
     if (
-        not df_match.empty and
-        not any(d["Código"] == cod for d in st.session_state["produtos_selecionados"])
+        item_escolhido
+        and item_escolhido != "Digite ou selecione um produto..."
+        and not df_base.empty
     ):
-        prod_info = df_match.iloc[0]
-        st.session_state["produtos_selecionados"].append({
-            "Levar": True,
-            "Código": cod,
-            "Status": prod_info["Status"],
-            "Descrição": prod_info["Descrição"],
-            "Preço Atual": float(prod_info["Preço Atual"]),
-            "Comissão": 0.0,
-            "FLEX": 0.0,
-            "DESC": 0.0,
-            "Imposto": False,
-            "Preço Final": float(prod_info["Preço Atual"]),
-            "ST_Flag": prod_info.get("ST_Flag", "")
-        })
+        limite = st.session_state.get("num_produtos_layout", 0)
+
+        if limite > 0 and len(st.session_state["produtos_selecionados"]) >= limite:
+            st.toast(
+                f"🚨 Limite máximo atingido! O layout atual só permite {limite} itens.",
+                icon="⚠️"
+            )
+        else:
+            raw_cod = item_escolhido.split(" | ")[0]
+            cod = raw_cod.replace("🔴 [JÁ ADICIONADO] ", "").strip()
+
+            df_match = df_base[df_base["Código"] == cod]
+
+            if (
+                not df_match.empty
+                and not any(d["Código"] == cod for d in st.session_state["produtos_selecionados"])
+            ):
+                prod_info = df_match.iloc[0]
+                st.session_state["produtos_selecionados"].append({
+                    "Levar": True,
+                    "Código": cod,
+                    "Status": prod_info["Status"],
+                    "Descrição": prod_info["Descrição"],
+                    "Preço Atual": float(prod_info["Preço Atual"]),
+                    "Comissão": 0.0,
+                    "FLEX": 0.0,
+                    "DESC": 0.0,
+                    "Imposto": False,
+                    "Preço Final": float(prod_info["Preço Atual"]),
+                    "ST_Flag": prod_info.get("ST_Flag", "")
+                })
 
     st.session_state["busca_temp"] = None
 
 
-def salvar_imagem_upload(uploaded_file, codigo_produto):
-    if uploaded_file is None:
-        return False
+def mover_cima(index):
+    if index > 0:
+        lista = st.session_state['produtos_selecionados']
+        lista[index], lista[index-1] = lista[index-1], lista[index]
 
+
+def mover_baixo(index):
+    lista = st.session_state['produtos_selecionados']
+    if index < len(lista) - 1:
+        lista[index], lista[index+1] = lista[index+1], lista[index]
+
+
+def deletar_item(index):
+    st.session_state['produtos_selecionados'].pop(index)
+
+
+def atualizar_valores_uid(index=None, u_id=None):
+    if index is None and u_id is not None:
+        index = next((idx for idx, p in enumerate(
+            st.session_state['produtos_selecionados']) if p['Código'] == u_id), None)
+    if index is not None:
+        prod = st.session_state['produtos_selecionados'][index]
+        pr_val = st.session_state.get(
+            f"pr_{u_id}", prod.get('Preço Atual', 0.0))
+        co_val = st.session_state.get(f"co_{u_id}", prod.get('Comissão', 0.0))
+        fl_val = st.session_state.get(f"fl_{u_id}", prod.get('FLEX', 0.0))
+        de_val = st.session_state.get(f"de_{u_id}", prod.get('DESC', 0.0))
+        im_val = st.session_state.get(f"im_{u_id}", prod.get('Imposto', False))
+
+        prod['Preço Atual'] = float(pr_val if pr_val is not None else 0.0)
+        prod['Comissão'] = float(co_val if co_val is not None else 0.0)
+        prod['FLEX'] = float(fl_val if fl_val is not None else 0.0)
+        prod['DESC'] = float(de_val if de_val is not None else 0.0)
+        prod['Imposto'] = bool(im_val)
+
+        calc = prod['Preço Atual'] * (1 + (prod['Comissão'] / 100.0))
+        calc = calc * (1 + (prod['FLEX'] / 100.0))
+        calc = calc * (1 - (prod['DESC'] / 100.0))
+        if prod['Imposto']:
+            calc = calc * 1.101
+        prod['Preço Final'] = round(calc, 2)
+
+
+def step_value(u_id, prefix, delta):
+    key = f"{prefix}_{u_id}"
+    current_val = st.session_state.get(key, 0.0)
+    st.session_state[key] = round(
+        (current_val if current_val is not None else 0.0) + delta, 1)
+    atualizar_valores_uid(u_id=u_id)
+
+
+def checar_imposto_st(df):
+    alertas = []
+    for _, row in df.iterrows():
+        if str(row.get('ST_Flag', '')).strip() != '*' and not bool(row.get('Imposto', False)):
+            alertas.append(row['Descrição'])
+    return alertas
+
+
+def add_auto_products(df_subset, max_items):
+    added = 0
+    for _, row in df_subset.iterrows():
+        if max_items > 0 and added >= max_items:
+            break
+        cod = row['Código']
+        if not any(d['Código'] == cod for d in st.session_state['produtos_selecionados']):
+            st.session_state['produtos_selecionados'].append({
+                'Levar': True, 'Código': cod, 'Status': row['Status'],
+                'Descrição': row['Descrição'], 'Preço Atual': float(row['Preço Atual']),
+                'Comissão': 0.0, 'FLEX': 0.0, 'DESC': 0.0, 'Imposto': False,
+                'Preço Final': float(row['Preço Atual']), 'ST_Flag': row.get('ST_Flag', '')
+            })
+            added += 1
+
+
+def normalizar_codigo_imagem(codigo: str) -> str:
+    if not codigo:
+        return ""
+    s = str(codigo).split("-")[0]
+    return re.sub(r"\D", "", s)
+
+
+@st.cache_data
+def obter_indice_imagens():
     base_dir = os.path.dirname(os.path.abspath(__file__))
     pasta_imagens = os.path.join(base_dir, "Base de Imagens")
-    os.makedirs(pasta_imagens, exist_ok=True)
+    idx = {}
+    if not os.path.exists(pasta_imagens):
+        return idx
+    for root, _, files in os.walk(pasta_imagens):
+        for fn in files:
+            ext = os.path.splitext(fn)[1].lower()
+            if ext in (".jpg", ".jpeg", ".png", ".webp"):
+                base = os.path.splitext(fn)[0]
+                num = re.sub(r"\D", "", base)
+                if num:
+                    idx[num] = os.path.join(root, fn)
+    return idx
 
-    codigo_normalizado = normalizar_codigo_imagem(codigo_produto) or str(codigo_produto).strip()
 
-    for caminho_antigo in glob.glob(os.path.join(pasta_imagens, f"{codigo_normalizado}.*")):
-        try:
-            os.remove(caminho_antigo)
-        except Exception:
-            pass
+def salvar_imagem_upload(uploaded_file, codigo_produto):
+    if uploaded_file is not None:
+        # Define o caminho para a pasta Base de Imagens
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        pasta_imagens = os.path.join(base_dir, "Base de Imagens")
 
-    extensao = os.path.splitext(uploaded_file.name)[1].lower()
-    if extensao not in [".jpg", ".jpeg", ".png", ".webp"]:
-        extensao = ".jpg"
+        # Cria a pasta se ela não existir
+        os.makedirs(pasta_imagens, exist_ok=True)
 
-    caminho_salvar = os.path.join(pasta_imagens, f"{codigo_normalizado}{extensao}")
+        # Pega a extensão original do arquivo (ex: .jpg, .png)
+        extensao = os.path.splitext(uploaded_file.name)[1].lower()
+        if not extensao:
+            extensao = ".jpg"  # fallback seguro
 
-    with open(caminho_salvar, "wb") as f:
-        f.write(uploaded_file.getbuffer())
+        # Define o caminho do novo arquivo usando o código do produto
+        caminho_salvar = os.path.join(
+            pasta_imagens, f"{codigo_produto}{extensao}")
 
-    st.cache_data.clear()
-    return True
+        # Salva o arquivo fisicamente
+        with open(caminho_salvar, "wb") as f:
+            f.write(uploaded_file.getbuffer())
 
+        # Limpa o cache para forçar a função obter_indice_imagens() a ler a nova imagem
+        st.cache_data.clear()
+        return True
+    return False
 
 
 def image_to_base64(img_path):
@@ -246,103 +294,6 @@ def obter_template_individual(base_dir, versao):
         if os.path.exists(caminho):
             return caminho
     return candidatos[0]
-
-
-def extrair_numero_layout(nome_arquivo: str) -> int:
-    nome_base = os.path.basename(nome_arquivo)
-    match = re.search(r'(\d+)(?=\.(jpg|jpeg|png|webp)$)', nome_base, re.IGNORECASE)
-    return int(match.group(1)) if match else 1
-
-
-def listar_layouts_grade(base_dir, n_layout):
-    if n_layout == 0:
-        return []
-
-    if n_layout == 9:
-        arquivos = glob.glob(os.path.join(base_dir, "FUNDO-BASE-USADO-NA-AUTOMACAO-*.jpg"))
-    else:
-        arquivos = glob.glob(os.path.join(base_dir, f"Modelo {n_layout} Espaços-*.jpg"))
-
-    arquivos = sorted(set(arquivos), key=extrair_numero_layout)
-
-    return [
-        {
-            "label": f"Layout {extrair_numero_layout(arq)}",
-            "path": arq,
-            "versao": str(extrair_numero_layout(arq))
-        }
-        for arq in arquivos
-    ]
-
-
-def listar_layouts_individuais(base_dir):
-    arquivos = glob.glob(os.path.join(base_dir, "Modelo_arte_individual-*.jpg"))
-    arquivos += glob.glob(os.path.join(base_dir, "Modelo_arte_individual_*.jpg"))
-    arquivos = sorted(set(arquivos), key=extrair_numero_layout)
-
-    return [
-        {
-            "label": f"Layout {extrair_numero_layout(arq)}",
-            "path": arq,
-            "versao": str(extrair_numero_layout(arq))
-        }
-        for arq in arquivos
-    ]
-
-
-def obter_layout_selecionado(layouts, session_key):
-    if not layouts:
-        return None
-
-    atual = st.session_state.get(session_key)
-    if not atual:
-        st.session_state[session_key] = layouts[0]["label"]
-        return layouts[0]
-
-    for item in layouts:
-        if item["label"] == atual:
-            return item
-
-    st.session_state[session_key] = layouts[0]["label"]
-    return layouts[0]
-
-
-def renderizar_seletor_layouts(titulo, layouts, session_key, colunas_por_linha=3):
-    st.markdown(f"#### {titulo}")
-
-    if not layouts:
-        st.warning("Nenhum layout encontrado para esta seção.")
-        return
-
-    layout_atual = obter_layout_selecionado(layouts, session_key)
-    cols = st.columns(colunas_por_linha)
-
-    for i, item in enumerate(layouts):
-        selecionado = layout_atual and item["label"] == layout_atual["label"]
-        classe_card = "layout-card layout-card-selected" if selecionado else "layout-card"
-        classe_badge = "layout-badge selected" if selecionado else "layout-badge"
-
-        with cols[i % colunas_por_linha]:
-            st.markdown(f"""
-                <div class="{classe_card}">
-                    <div class="layout-card-title">{item['label']}</div>
-                </div>
-            """, unsafe_allow_html=True)
-
-            st.image(item["path"], use_container_width=True)
-
-            st.markdown(
-                f'<div style="text-align:center;"><span class="{classe_badge}">'
-                + ("Selecionado" if selecionado else "Disponível")
-                + "</span></div>",
-                unsafe_allow_html=True
-            )
-
-            botao_txt = "✅ Em uso" if selecionado else "Usar este layout"
-            if st.button(botao_txt, key=f"{session_key}_{item['label']}", use_container_width=True):
-                st.session_state[session_key] = item["label"]
-                st.rerun()
-
 
 
 def desenhar_placeholder(bg_img, x1, y1, x2, y2):
@@ -1666,31 +1617,23 @@ with tab1:
     codigos_ja_selecionados = [p['Código']
                                for p in st.session_state['produtos_selecionados']]
 
-if caminho_img and os.path.exists(caminho_img):
-    with st.popover("📤 Trocar", use_container_width=True):
-        st.caption("Selecione a nova imagem do produto")
-        nova_img = st.file_uploader(
-            "Imagem do produto",
-            type=['png', 'jpg', 'jpeg', 'webp'],
-            key=f"up_trocar_{uid}",
-            label_visibility="collapsed"
-        )
-        if nova_img and st.button("Salvar Troca", key=f"btn_trocar_{uid}", type="primary"):
-            salvar_imagem_upload(nova_img, cod)
-            st.rerun()
-else:
-    with st.popover("📤 Subir", use_container_width=True):
-        st.caption("Selecione a imagem do produto")
-        nova_img = st.file_uploader(
-            "Imagem do produto",
-            type=['png', 'jpg', 'jpeg', 'webp'],
-            key=f"up_novo_{uid}",
-            label_visibility="collapsed"
-        )
-        if nova_img and st.button("Salvar Imagem", key=f"btn_novo_{uid}", type="primary"):
-            salvar_imagem_upload(nova_img, cod)
-            st.rerun()
+    if not df_filtrado.empty:
+        def formatar_opcao(x):
+            preco_atual, preco_antigo = f"R$ {x['Preço Atual']:.2f}", f"R$ {x['Preço Anterior']:.2f}"
+            tem_foto = "📸 Com Foto" if normalizar_codigo_imagem(
+                x['Código']) in img_idx_busca else "❌ Sem Foto"
+            texto_base = f"{x['Código']} | {x['Descrição']} | Atual: {preco_atual} (Era: {preco_antigo} - {x['Status']}) | {tem_foto}"
+            return f"🔴 [JÁ ADICIONADO] {texto_base}" if str(x['Código']) in codigos_ja_selecionados else texto_base
 
+        opcoes_busca = ["Digite ou selecione um produto..."] + \
+            df_filtrado.apply(formatar_opcao, axis=1).tolist()
+    else:
+        opcoes_busca = ["Digite ou selecione um produto..."]
+
+    col_busca, col_limpar, col_atualizar = st.columns([5, 1.2, 1.2])
+    with col_busca:
+        st.selectbox("Adicionar Produto:", options=opcoes_busca, key="busca_temp",
+                     on_change=processar_busca, label_visibility="collapsed")
     with col_limpar:
         if st.button("🗑️ Esvaziar Tudo", use_container_width=True):
             st.session_state['produtos_selecionados'], st.session_state['galeria_individuais'], st.session_state['confirmacao_st'] = [
@@ -1896,86 +1839,56 @@ with st.expander("Finalizar e Gerar Artes...", expanded=True):
     st.markdown("<p class='titulo-secao'>Painel de Geração</p>",
                 unsafe_allow_html=True)
 
-st.markdown("""
-<div style="margin-top:18px;">
-    <h3 style="margin-bottom:4px;">🎨 Finalizar e Gerar Artes</h3>
-    <p style="color:#475569; margin-top:0;">
-        Escolha visualmente o layout pelas miniaturas abaixo antes de gerar ou baixar.
-    </p>
-</div>
-""", unsafe_allow_html=True)
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    n_layout = st.session_state.get("num_produtos_layout", 0)
+    opt_grade = st.session_state.get("sel_grade", "Layout 1")
+    opt_indiv = st.session_state.get("sel_indiv", "Layout 1")
 
-base_dir = os.path.dirname(os.path.abspath(__file__))
-n_layout = st.session_state.get("num_produtos_layout", 0)
+    num_versao_grade = opt_grade.split()[-1]
+    num_versao_indiv = opt_indiv.split()[-1]
 
-layouts_grade = listar_layouts_grade(base_dir, n_layout) if n_layout != 0 else []
-layouts_indiv = listar_layouts_individuais(base_dir)
+    btn1, btn2, btn3 = st.columns(3)
 
-layout_grade_selecionado = obter_layout_selecionado(layouts_grade, "sel_grade") if layouts_grade else None
-layout_indiv_selecionado = obter_layout_selecionado(layouts_indiv, "sel_indiv") if layouts_indiv else None
-
-st.markdown("### 🖼️ Escolha os Layouts")
-prev1, prev2 = st.columns(2)
-
-with prev1:
-    texto_layout = "Sem Limite Definido" if n_layout == 0 else f"{n_layout} Espaços"
-    st.markdown(f"#### Tabloide em Grade ({texto_layout})")
-
-    if n_layout == 0:
-        st.info("Para tabloide em grade, selecione antes um layout fixo no menu lateral.")
-    else:
-        renderizar_seletor_layouts(
-            titulo="Modelos disponíveis para Grade",
-            layouts=layouts_grade,
-            session_key="sel_grade",
-            colunas_por_linha=2
-        )
-
-with prev2:
-    renderizar_seletor_layouts(
-        titulo="Modelos disponíveis para Artes Individuais",
-        layouts=layouts_indiv,
-        session_key="sel_indiv",
-        colunas_por_linha=2
-    )
-
-st.markdown("---")
-btn1, btn2, btn3 = st.columns(3)
-
-with btn1:
-    if st.button("GERAR TABLOIDE (GRADE)", type="primary", use_container_width=True):
-        if n_layout == 0:
-            st.error("Para gerar um tabloide em grade, escolha um layout fixo (9, 12, 16 ou 20) no menu lateral.")
-        elif layout_grade_selecionado is None:
-            st.error("Nenhum layout de grade foi encontrado para este formato.")
-        else:
-            st.session_state["galeria_individuais"] = []
-            st.session_state["pdf_buffer_pronto"] = None
-
-            df_final = pd.DataFrame(st.session_state["produtos_selecionados"])
-            if not df_final.empty:
-                df_final = df_final[df_final["Levar"] == True]
-
-            if df_final.empty:
-                st.error("Você não deixou nenhum item marcado!")
+    with btn1:
+        if st.button("GERAR TABLOIDE (GRADE)", type="primary", use_container_width=True):
+            if n_layout == 0:
+                st.error(
+                    "Para gerar um tabloide em grade, escolha um layout fixo (9, 12, 16 ou 20) no menu lateral.")
             else:
-                fpath_grade = layout_grade_selecionado["path"]
-                alertas = checar_imposto_st(df_final)
+                st.session_state["galeria_individuais"] = []
+                st.session_state["pdf_buffer_pronto"] = None
 
-                if alertas:
-                    st.session_state["confirmacao_st"] = "grade"
-                    st.session_state["alertas_st"] = alertas
-                    st.session_state["df_pendente"] = df_final
-                    st.session_state["path_pendente"] = fpath_grade
+                df_final = pd.DataFrame(
+                    st.session_state["produtos_selecionados"])
+                if not df_final.empty:
+                    df_final = df_final[df_final["Levar"] == True]
+
+                if df_final.empty:
+                    st.error("Você não deixou nenhum item marcado!")
                 else:
-                    st.session_state["confirmacao_st"] = None
-                    acionar_gerador_grade(df_final, fpath_grade, n_layout)
+                    padrao_fundo = LAYOUTS.get(n_layout, LAYOUTS[9])[
+                        "bg_pattern"]
 
-with btn2:
-    if st.button("GERAR ARTES INDIVIDUAIS", type="secondary", use_container_width=True):
-        if layout_indiv_selecionado is None:
-            st.error("Nenhum layout individual foi encontrado.")
-        else:
+                    if "Modelo" in padrao_fundo:
+                        fundo_grade_name = f"Modelo {n_layout} Espaços-{num_versao_grade}.jpg"
+                    else:
+                        fundo_grade_name = f"FUNDO-BASE-USADO-NA-AUTOMACAO-{num_versao_grade}.jpg"
+
+                    fpath_grade = os.path.join(base_dir, fundo_grade_name)
+
+                    alertas = checar_imposto_st(df_final)
+                    if alertas:
+                        st.session_state["confirmacao_st"] = "grade"
+                        st.session_state["alertas_st"] = alertas
+                        st.session_state["df_pendente"] = df_final
+                        st.session_state["path_pendente"] = fpath_grade
+                    else:
+                        st.session_state["confirmacao_st"] = None
+                        acionar_gerador_grade(df_final, fpath_grade, n_layout)
+
+    with btn2:
+        if st.button("GERAR ARTES INDIVIDUAIS", type="secondary", use_container_width=True):
+            fpath_indiv = obter_template_individual(base_dir, num_versao_indiv)
             st.session_state["pdf_buffer_pronto"] = None
 
             df_final = pd.DataFrame(st.session_state["produtos_selecionados"])
@@ -1985,9 +1898,7 @@ with btn2:
             if df_final.empty:
                 st.error("O painel está vazio ou sem itens marcados!")
             else:
-                fpath_indiv = layout_indiv_selecionado["path"]
                 alertas = checar_imposto_st(df_final)
-
                 if alertas:
                     st.session_state["confirmacao_st"] = "indiv"
                     st.session_state["alertas_st"] = alertas
@@ -1995,49 +1906,93 @@ with btn2:
                     st.session_state["path_pendente"] = fpath_indiv
                 else:
                     st.session_state["confirmacao_st"] = None
-                    st.session_state["galeria_individuais"] = acionar_gerador_individual(df_final, fpath_indiv)
+                    st.session_state["galeria_individuais"] = acionar_gerador_individual(
+                        df_final, fpath_indiv)
 
-with btn3:
-    if st.button("GERAR PDF PLANILHA", type="secondary", use_container_width=True):
-        st.session_state["pdf_buffer_pronto"] = None
+    with btn3:
+        if st.button("GERAR PDF PLANILHA", type="secondary", use_container_width=True):
+            st.session_state["pdf_buffer_pronto"] = None
 
-        df_final = pd.DataFrame(st.session_state["produtos_selecionados"])
-        if not df_final.empty:
-            df_final = df_final[df_final["Levar"] == True]
+            df_final = pd.DataFrame(st.session_state["produtos_selecionados"])
+            if not df_final.empty:
+                df_final = df_final[df_final["Levar"] == True]
 
-        if df_final.empty:
-            st.error("O painel está vazio ou sem itens marcados!")
-        else:
-            alertas = checar_imposto_st(df_final)
-
-            if alertas:
-                st.session_state["confirmacao_st"] = "pdf"
-                st.session_state["alertas_st"] = alertas
-                st.session_state["df_pendente"] = df_final
+            if df_final.empty:
+                st.error("O painel está vazio ou sem itens marcados!")
             else:
-                st.session_state["confirmacao_st"] = None
-                st.session_state["pdf_buffer_pronto"] = gerar_pdf_planilha(df_final)
+                alertas = checar_imposto_st(df_final)
+                if alertas:
+                    st.session_state["confirmacao_st"] = "pdf"
+                    st.session_state["alertas_st"] = alertas
+                    st.session_state["df_pendente"] = df_final
+                else:
+                    st.session_state["confirmacao_st"] = None
+                    st.session_state["pdf_buffer_pronto"] = gerar_pdf_planilha(
+                        df_final)
 
-    if st.session_state.get("pdf_buffer_pronto") is not None:
-        st.success("✅ PDF pronto para download!")
-        st.download_button(
-            label="📄 BAIXAR PDF INTERATIVO",
-            data=st.session_state["pdf_buffer_pronto"],
-            file_name=f"tabela_produtos_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
-            mime="application/pdf",
-            type="primary",
-            use_container_width=True
-    )
+    if st.session_state.get("confirmacao_st") is not None:
+        st.markdown(
+            "<div style='background-color:#fff1f2; border-left:4px solid #e11d48; padding:15px; margin-top:15px; margin-bottom:15px; border-radius:4px; box-shadow: 0px 4px 6px rgba(225, 29, 72, 0.1);'>"
+            "<h4 style='color:#e11d48; margin-top:0;'>⚠️ Atenção: Imposto Não Aplicado</h4>"
+            "<p style='color:#4c0519; margin-bottom:10px;'>Os seguintes produtos constam como <b>SEM S.T (Calcular)</b>, mas a caixa de <b>Imposto (+10.1%)</b> não foi marcada:</p>"
+            "<ul style='color:#881337; margin-bottom:15px; font-weight:bold;'>"
+            + "".join([f"<li>{p}</li>" for p in st.session_state["alertas_st"]]) +
+            "</ul><p style='color:#4c0519; font-weight:bold; margin-bottom:0;'>Deseja continuar a geração mesmo assim?</p></div>",
+            unsafe_allow_html=True
+        )
+
+        c_sim, c_nao = st.columns(2)
+
+        with c_sim:
+            if st.button("✅ SIM, CONTINUAR", type="primary", use_container_width=True):
+                acao = st.session_state["confirmacao_st"]
+                df_p = st.session_state["df_pendente"]
+                path_p = st.session_state.get("path_pendente", "")
+                st.session_state["confirmacao_st"] = None
+
+                if acao == "grade":
+                    acionar_gerador_grade(
+                        df_p, path_p, st.session_state.get("num_produtos_layout", 9))
+                elif acao == "indiv":
+                    st.session_state["galeria_individuais"] = acionar_gerador_individual(
+                        df_p, path_p)
+                elif acao == "pdf":
+                    st.session_state["pdf_buffer_pronto"] = gerar_pdf_planilha(
+                        df_p)
+
+        with c_nao:
+            if st.button("❌ NÃO, CANCELAR E ARRUMAR", type="secondary", use_container_width=True):
+                st.session_state["confirmacao_st"] = None
+                st.rerun()
+    # --- INÍCIO DO BLOCO DE DOWNLOAD DO PDF ---
+            if st.session_state.get('pdf_buffer_pronto') is not None:
+                st.markdown("<hr style='margin: 15px 0;'>",
+                            unsafe_allow_html=True)
+                st.download_button(
+                    label="⬇️ BAIXAR PDF GERADO",
+                    data=st.session_state['pdf_buffer_pronto'],
+                    file_name=f"produtos_planilha_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
+                    mime="application/pdf",
+                    type="primary",
+                    use_container_width=True
+                )
+    # --- FIM DO BLOCO DE DOWNLOAD DO PDF ---
 
         st.markdown(
+            "<hr style='margin: 15px 0;'><p class='subtitulo' style='text-align:center;'>🖼️ Escolha os Layouts</p>", unsafe_allow_html=True)
+        c_prev1, c_prev2, c_prev3 = st.columns(3)
+
+        with c_prev1:
+            texto_layout = "Sem Limite Definido" if n_layout == 0 else f"{n_layout} Espaços"
+            st.markdown(
                 f"<div style='text-align:center; font-weight:bold; color:#1E293B; margin-bottom:8px;'>Layout do Tabloide ({texto_layout})</div>", unsafe_allow_html=True)
-        st.selectbox("Versão Tabloide", [
+            st.selectbox("Versão Tabloide", [
                          "Layout 1", "Layout 2", "Layout 3", "Layout 4"], key="sel_grade", label_visibility="collapsed")
 
-        opt_g = st.session_state.get("sel_grade", "Layout 1")
-        num_v_g = opt_g.split()[-1]
+            opt_g = st.session_state.get("sel_grade", "Layout 1")
+            num_v_g = opt_g.split()[-1]
 
-        if n_layout != 0:
+            if n_layout != 0:
                 if n_layout == 9:
                     nome_fundo_grade = f"FUNDO-BASE-USADO-NA-AUTOMACAO-{num_v_g}.jpg"
                 else:
