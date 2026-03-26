@@ -225,7 +225,7 @@ def normalizar_codigo_imagem(codigo: str) -> str:
     return re.sub(r"\D", "", s)
 
 
-@st.cache_data(show_spinner=False, ttl=300)
+@st.cache_data
 def obter_indice_imagens():
     base_dir = os.path.dirname(os.path.abspath(__file__))
     pasta_imagens = os.path.join(base_dir, "Base de Imagens")
@@ -1046,7 +1046,7 @@ def manter_categoria_completa(txt):
     return s
 
 
-@st.cache_data(show_spinner=False, ttl=300)
+@st.cache_data
 def carregar_dados():
     base_dir = os.path.dirname(os.path.abspath(__file__))
     caminho_planilha = os.path.join(base_dir, "Programa_Destro-04-03.xlsx")
