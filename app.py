@@ -20,6 +20,8 @@ from reportlab.lib.enums import TA_CENTER, TA_LEFT
 from io import BytesIO
 from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas as pdfcanvas
+from data_loader import load_crm_data
+from image_manager import build_image_index, store_product_image, normalize_product_code, load_metadata
 
 # ==========================================
 # CONFIGURAÇÃO DA PÁGINA
@@ -357,24 +359,14 @@ def normalizar_codigo_imagem(codigo: str) -> str:
     if not codigo:
         return ""
     s = str(codigo).split("-")[0]
-    return re.sub(r"\D", "", s)
+    return normalize_product_code(s)
 
 
 @st.cache_data(ttl=CACHE_TTL_SECONDS, show_spinner=False)
 def obter_indice_imagens():
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    pasta_imagens = os.path.join(base_dir, "Base de Imagens")
-    idx = {}
-    if not os.path.exists(pasta_imagens):
-        return idx
-    for root, _, files in os.walk(pasta_imagens):
-        for fn in files:
-            ext = os.path.splitext(fn)[1].lower()
-            if ext in (".jpg", ".jpeg", ".png", ".webp"):
-                base = os.path.splitext(fn)[0]
-                num = re.sub(r"\D", "", base)
-                if num:
-                    idx[num] = os.path.join(root, fn)
+    idx, metadata = build_image_index(base_dir)
+    st.session_state["image_metadata"] = metadata
     return idx
 
 
@@ -391,31 +383,27 @@ def salvar_imagem_upload(uploaded_file, codigo_produto):
             st.error(msg)
             return False
 
-        codigo_limpo = re.sub(r"\D", "", str(codigo_produto))
+        codigo_limpo = normalize_product_code(str(codigo_produto))
         if not codigo_limpo:
             st.error("Código de produto inválido para salvar imagem.")
             return False
 
-        # Define o caminho para a pasta Base de Imagens
         base_dir = os.path.dirname(os.path.abspath(__file__))
-        pasta_imagens = os.path.join(base_dir, "Base de Imagens")
-
-        # Cria a pasta se ela não existir
-        os.makedirs(pasta_imagens, exist_ok=True)
-
-        # Pega a extensão original do arquivo (ex: .jpg, .png)
-        extensao = os.path.splitext(uploaded_file.name)[1].lower()
-        if not extensao:
-            extensao = ".jpg"  # fallback seguro
-
-        # Define o caminho do novo arquivo usando o código do produto
-        caminho_salvar = os.path.join(
-            pasta_imagens, f"{codigo_limpo}{extensao}")
-
-        # Salva o arquivo fisicamente
         try:
-            with open(caminho_salvar, "wb") as f:
-                f.write(uploaded_file.getbuffer())
+            ok, msg, meta = store_product_image(
+                base_dir=base_dir,
+                uploaded_file=uploaded_file,
+                code=codigo_limpo,
+                allowed_exts=ALLOWED_IMAGE_EXTENSIONS,
+                max_mb=MAX_UPLOAD_IMAGE_MB,
+            )
+            if not ok:
+                st.error(msg)
+                return False
+
+            if meta.get("replaced_previous"):
+                st.info("Imagem anterior substituída com backup automático.")
+            st.session_state["last_image_upload_meta"] = meta
         except OSError as exc:
             logger.exception("Erro ao salvar imagem no disco: %s", exc)
             st.error("Não foi possível salvar a imagem. Verifique permissões da pasta e tente novamente.")
@@ -1506,14 +1494,37 @@ def carregar_dados():
     return df, curva_abc_codigos
 
 
+# Camada robusta de carregamento (FASE 5) com validação de estrutura e mensagens padronizadas.
+@st.cache_data(ttl=CACHE_TTL_SECONDS, show_spinner=False)
+def carregar_dados_robusto():
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    caminho_planilha = os.path.join(base_dir, "Programa_Destro-04-03.xlsx")
+    df, curva_abc_codigos, warnings, fatal_error = load_crm_data(caminho_planilha)
+    return df, curva_abc_codigos, warnings, fatal_error, caminho_planilha
+
+
 # ==============================================================
 # CARREGAMENTO SEGURO DA SESSÃO
 # ==============================================================
 try:
-    df_raw, lista_abc = carregar_dados()
+    df_raw, lista_abc, data_warnings, data_fatal_error, _planilha_path = carregar_dados_robusto()
 except ValueError:
     st.cache_data.clear()
-    df_raw, lista_abc = carregar_dados()
+    df_raw, lista_abc, data_warnings, data_fatal_error, _planilha_path = carregar_dados_robusto()
+
+if data_fatal_error == "PLANILHA_NAO_ENCONTRADA":
+    st.error("🚨 PLANILHA NÃO ENCONTRADA: o arquivo principal de dados não foi localizado no diretório do app.")
+    logger.error("Planilha principal ausente no caminho esperado: %s", _planilha_path)
+elif data_fatal_error == "PLANILHA_CORROMPIDA_OU_INVALIDA":
+    st.error("🚨 PLANILHA INVÁLIDA OU CORROMPIDA: verifique integridade do arquivo Excel.")
+    logger.error("Planilha inválida/corrompida: %s", _planilha_path)
+elif data_fatal_error == "ESTRUTURA_BANCO_DADOS_INVALIDA":
+    st.error("🚨 ESTRUTURA DA PLANILHA INCOMPATÍVEL: faltam colunas essenciais na aba Banco_Dados_Semanal.")
+elif data_fatal_error == "ERRO_PROCESSAMENTO_PLANILHA":
+    st.error("🚨 Erro ao processar dados da planilha. Verifique o log técnico para detalhes.")
+
+if data_warnings:
+    st.session_state["data_loader_warnings"] = data_warnings
 
 st.session_state['codigos_abc_planilha'] = lista_abc
 
@@ -1535,12 +1546,52 @@ def atualizar_prazo():
             atualizar_valores_uid(u_id=cod)
 
 
+@st.cache_data(ttl=CACHE_TTL_SECONDS, show_spinner=False)
+def preparar_df_app(df_source, prazo_selecionado):
+    df_app_local = df_source.copy()
+    if df_app_local.empty:
+        return df_app_local
+
+    if prazo_selecionado not in {"Preço_7", "Preço_14", "Preço_21", "Preço_28"}:
+        prazo_selecionado = "Preço_7"
+
+    df_app_local['Preço Atual'] = df_app_local[prazo_selecionado].fillna(df_app_local['Preço_7'])
+    df_app_local['Preço Anterior'] = df_app_local['Preço Atual'] * df_app_local['Fator_Anterior']
+    df_app_local['Preço Anterior'] = np.where(df_app_local['Preço Anterior'] == 0, 1, df_app_local['Preço Anterior'])
+    df_app_local['Desconto %'] = (
+        (df_app_local['Preço Anterior'] - df_app_local['Preço Atual']) / df_app_local['Preço Anterior'] * 100
+    ).round(1)
+
+    def gerar_status(row):
+        perc = row['Desconto %']
+        if row['Preço Atual'] < row['Preço Anterior']:
+            return f"🟢 Baixou! (-{abs(perc)}%)"
+        if row['Preço Atual'] > row['Preço Anterior']:
+            return f"🔴 Aumentou! (+{abs(perc)}%)"
+        return "⚫ Igual"
+
+    df_app_local['Status'] = df_app_local.apply(gerar_status, axis=1)
+    return df_app_local
+
+
 # ==========================================
 # INTERFACE DO STREAMLIT
 # ==========================================
 with st.sidebar:
     st.image("https://cdn-icons-png.flaticon.com/512/3144/3144456.png", width=60)
     st.caption(f"Versão do app: {APP_VERSION}")
+    if st.session_state.get("data_loader_warnings"):
+        with st.expander("⚠️ Avisos da base de dados", expanded=False):
+            for w in st.session_state["data_loader_warnings"]:
+                st.warning(w)
+    try:
+        img_meta = load_metadata(os.path.dirname(os.path.abspath(__file__)))
+        with st.expander("🖼️ Banco de imagens", expanded=False):
+            st.caption(f"Imagens com metadados: {len(img_meta.get('images', {}))}")
+            if img_meta.get("updated_at"):
+                st.caption(f"Última atualização: {img_meta.get('updated_at')}")
+    except Exception as exc:
+        logger.warning("Falha ao ler metadados de imagens: %s", exc)
 
     if st.button("🔄 Forçar atualização completa", use_container_width=True):
         forcar_refresh_app(limpar_sessao=True)
@@ -1688,26 +1739,7 @@ with st.sidebar:
     if not prazo_selecionado:
         prazo_selecionado = "Preço_7"
 
-    df_app = df_raw.copy()
-    if not df_app.empty:
-        df_app['Preço Atual'] = df_app[prazo_selecionado].fillna(
-            df_app['Preço_7'])
-        df_app['Preço Anterior'] = df_app['Preço Atual'] * \
-            df_app['Fator_Anterior']
-        df_app['Preço Anterior'] = np.where(
-            df_app['Preço Anterior'] == 0, 1, df_app['Preço Anterior'])
-        df_app['Desconto %'] = (
-            (df_app['Preço Anterior'] - df_app['Preço Atual']) / df_app['Preço Anterior'] * 100).round(1)
-
-        def gerar_status(row):
-            perc = row['Desconto %']
-            if row['Preço Atual'] < row['Preço Anterior']:
-                return f"🟢 Baixou! (-{abs(perc)}%)"
-            elif row['Preço Atual'] > row['Preço Anterior']:
-                return f"🔴 Aumentou! (+{abs(perc)}%)"
-            else:
-                return "⚫ Igual"
-        df_app['Status'] = df_app.apply(gerar_status, axis=1)
+    df_app = preparar_df_app(df_raw, prazo_selecionado)
 
     df_filtrado = df_app.copy()
     st.divider()
