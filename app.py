@@ -37,7 +37,7 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
-APP_VERSION = "2026.03.26.01"
+APP_VERSION = "2026.03.27.02"
 MAX_UPLOAD_IMAGE_MB = 10
 MAX_UPLOAD_PDF_MB = 20
 ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
