@@ -162,6 +162,15 @@ if 'path_pendente' not in st.session_state:
 if 'pdf_buffer_pronto' not in st.session_state:
     st.session_state['pdf_buffer_pronto'] = None
 
+
+def get_produtos_painel():
+    produtos = st.session_state.get("produtos_selecionados")
+    if not isinstance(produtos, list):
+        produtos = []
+        st.session_state["produtos_selecionados"] = produtos
+    return produtos
+
+
 UI_TEXT = {
     "app_name": "CRM Destro - RCA",
     "app_subtitle": "Plataforma comercial para montagem de tabloides, artes e PDFs com fluxo operacional guiado.",
@@ -223,6 +232,7 @@ def normalize_numeric_value(val, fallback=0.0, min_value=None, max_value=None):
 def processar_busca():
     item_escolhido = st.session_state.get("busca_temp")
     df_base = st.session_state.get("df_filtrado_atual", pd.DataFrame())
+    produtos = get_produtos_painel()
 
     if (
         item_escolhido
@@ -231,7 +241,7 @@ def processar_busca():
     ):
         limite = st.session_state.get("num_produtos_layout", 0)
 
-        if limite > 0 and len(st.session_state["produtos_selecionados"]) >= limite:
+        if limite > 0 and len(produtos) >= limite:
             st.toast(
                 f"🚨 Limite máximo atingido! O layout atual só permite {limite} itens.",
                 icon="⚠️"
@@ -244,10 +254,10 @@ def processar_busca():
 
             if (
                 not df_match.empty
-                and not any(d["Código"] == cod for d in st.session_state["produtos_selecionados"])
+                and not any(d["Código"] == cod for d in produtos)
             ):
                 prod_info = df_match.iloc[0]
-                st.session_state["produtos_selecionados"].append({
+                produtos.append({
                     "Levar": True,
                     "Código": cod,
                     "Status": prod_info["Status"],
@@ -266,26 +276,28 @@ def processar_busca():
 
 def mover_cima(index):
     if index > 0:
-        lista = st.session_state['produtos_selecionados']
+        lista = get_produtos_painel()
         lista[index], lista[index-1] = lista[index-1], lista[index]
 
 
 def mover_baixo(index):
-    lista = st.session_state['produtos_selecionados']
+    lista = get_produtos_painel()
     if index < len(lista) - 1:
         lista[index], lista[index+1] = lista[index+1], lista[index]
 
 
 def deletar_item(index):
-    st.session_state['produtos_selecionados'].pop(index)
+    lista = get_produtos_painel()
+    if 0 <= index < len(lista):
+        lista.pop(index)
 
 
 def atualizar_valores_uid(index=None, u_id=None):
+    produtos = get_produtos_painel()
     if index is None and u_id is not None:
-        index = next((idx for idx, p in enumerate(
-            st.session_state['produtos_selecionados']) if p['Código'] == u_id), None)
-    if index is not None:
-        prod = st.session_state['produtos_selecionados'][index]
+        index = next((idx for idx, p in enumerate(produtos) if p['Código'] == u_id), None)
+    if index is not None and 0 <= index < len(produtos):
+        prod = produtos[index]
         pr_val = st.session_state.get(
             f"pr_{u_id}", prod.get('Preço Atual', 0.0))
         co_val = st.session_state.get(f"co_{u_id}", prod.get('Comissão', 0.0))
@@ -324,13 +336,14 @@ def checar_imposto_st(df):
 
 
 def add_auto_products(df_subset, max_items):
+    produtos = get_produtos_painel()
     added = 0
     for _, row in df_subset.iterrows():
         if max_items > 0 and added >= max_items:
             break
         cod = row['Código']
-        if not any(d['Código'] == cod for d in st.session_state['produtos_selecionados']):
-            st.session_state['produtos_selecionados'].append({
+        if not any(d['Código'] == cod for d in produtos):
+            produtos.append({
                 'Levar': True, 'Código': cod, 'Status': row['Status'],
                 'Descrição': row['Descrição'], 'Preço Atual': float(row['Preço Atual']),
                 'Comissão': 0.0, 'FLEX': 0.0, 'DESC': 0.0, 'Imposto': False,
@@ -1517,7 +1530,7 @@ def atualizar_prazo():
     novo_prazo = st.session_state.prazo_selector
     if not novo_prazo:
         novo_prazo = "Preço_7"
-    for prod in st.session_state['produtos_selecionados']:
+    for prod in get_produtos_painel():
         cod = prod['Código']
         row = df_raw[df_raw['Código'] == cod]
         if not row.empty:
@@ -1544,7 +1557,7 @@ with st.sidebar:
     if st.session_state.get("data_loader_warnings"):
         with st.expander("⚠️ Avisos da base de dados", expanded=False):
             for w in st.session_state["data_loader_warnings"]:
-                st.warning(w)
+                st.caption(f"- {w}")
     try:
         img_meta = load_metadata(os.path.dirname(os.path.abspath(__file__)))
         with st.expander("🖼️ Banco de imagens", expanded=False):
@@ -1615,8 +1628,9 @@ with st.sidebar:
                                 r[prazo_atual]) else r['Preço_7']
 
                             # Adiciona se já não estiver na lista
-                            if not any(d['Código'] == r['Código'] for d in st.session_state['produtos_selecionados']):
-                                st.session_state['produtos_selecionados'].append({
+                            produtos = get_produtos_painel()
+                            if not any(d['Código'] == r['Código'] for d in produtos):
+                                produtos.append({
                                     'Levar': True, 'Código': r['Código'], 'Status': 'Incluído via Pedido',
                                     'Descrição': r['Descrição'], 'Preço Atual': float(preco_base),
                                     'Comissão': 0.0, 'FLEX': 0.0, 'DESC': 0.0, 'Imposto': False,
@@ -1768,7 +1782,24 @@ with st.sidebar:
     else:
         st.info("Nenhum item disponível para filtrar nessas categorias.")
 
-    st.session_state["df_filtrado_atual"] = df_filtrado.copy()
+    termo_busca_produto = st.text_input(
+        "Buscar por código ou descrição",
+        key="filtro_busca_produto",
+        placeholder="Digite parte do código ou da descrição para reduzir a lista",
+    ).strip()
+
+    if termo_busca_produto:
+        termo_norm = termo_busca_produto.lower()
+        mask_busca = (
+            df_filtrado["Código"].astype(str).str.lower().str.contains(termo_norm, na=False)
+            | df_filtrado["Descrição"].astype(str).str.lower().str.contains(termo_norm, na=False)
+        )
+        df_filtrado_busca = df_filtrado[mask_busca].head(300).copy()
+    else:
+        # Evita renderizar listas gigantes no selectbox.
+        df_filtrado_busca = df_filtrado.head(300).copy()
+
+    st.session_state["df_filtrado_atual"] = df_filtrado_busca
 
 
 tab1, tab2 = st.tabs(["📊 Montagem do Tabloide", "🤖 IA Limpador"])
@@ -1835,6 +1866,7 @@ with tab1:
         if st.button("📈 CURVA ABC", use_container_width=True):
             st.session_state['produtos_selecionados'] = []
             st.session_state['num_produtos_layout'] = 20
+            produtos_painel = get_produtos_painel()
             faltantes = []
             codigos_para_adicionar = st.session_state.get(
                 'codigos_abc_planilha', [])
@@ -1846,8 +1878,8 @@ with tab1:
                     faltantes.append(cod)
                 else:
                     r = df_match.iloc[0]
-                    if not any(d['Código'] == r['Código'] for d in st.session_state['produtos_selecionados']):
-                        st.session_state['produtos_selecionados'].append({
+                    if not any(d['Código'] == r['Código'] for d in produtos_painel):
+                        produtos_painel.append({
                             'Levar': True, 'Código': r['Código'], 'Status': r['Status'],
                             'Descrição': r['Descrição'], 'Preço Atual': float(r['Preço Atual']),
                             'Comissão': 0.0, 'FLEX': 0.0, 'DESC': 0.0, 'Imposto': False,
@@ -1867,13 +1899,10 @@ with tab1:
                 unsafe_allow_html=True)
 
     img_idx_busca = obter_indice_imagens()
-    produtos_painel = st.session_state.get('produtos_selecionados', [])
-    if not isinstance(produtos_painel, list):
-        produtos_painel = []
-        st.session_state['produtos_selecionados'] = produtos_painel
+    produtos_painel = get_produtos_painel()
     codigos_ja_selecionados = [p['Código'] for p in produtos_painel]
 
-    if not df_filtrado.empty:
+    if not df_filtrado_busca.empty:
         def formatar_opcao(x):
             preco_atual, preco_antigo = f"R$ {x['Preço Atual']:.2f}", f"R$ {x['Preço Anterior']:.2f}"
             tem_foto = "📸 Com Foto" if normalizar_codigo_imagem(
@@ -1882,7 +1911,7 @@ with tab1:
             return f"🔴 [JÁ ADICIONADO] {texto_base}" if str(x['Código']) in codigos_ja_selecionados else texto_base
 
         opcoes_busca = ["Digite ou selecione um produto..."] + \
-            df_filtrado.apply(formatar_opcao, axis=1).tolist()
+            df_filtrado_busca.apply(formatar_opcao, axis=1).tolist()
     else:
         opcoes_busca = ["Digite ou selecione um produto..."]
 
@@ -2014,7 +2043,6 @@ with tab1:
             with b4:
                 if st.button("❌", key=f"del_{uid}", type="tertiary"):
                     deletar_item(i)
-            st.caption("Ações rápidas: marcar, reordenar, remover e atualizar imagem.")
 
             # Segunda linha de ações (Trocar/Subir imagem)
             if caminho_img and os.path.exists(caminho_img):
@@ -2075,16 +2103,14 @@ with tab1:
             st.write(f"**{prod['Descrição']}**")
 
         with c_pr:
-            st.number_input("Preço atual", format="%.2f", step=None, key=f"pr_{uid}", on_change=atualizar_valores_uid, args=(
-                i, uid), label_visibility="collapsed")
+            st.number_input("Preço atual", format="%.2f", step=None, key=f"pr_{uid}", label_visibility="collapsed")
 
         with c_co:
             m_co, i_co, p_co = st.columns(
                 [0.7, 2.0, 0.7], gap="small", vertical_alignment="center")
             m_co.button("➖", key=f"co_m_{uid}", type="tertiary",
                         on_click=step_value, args=(uid, 'co_', -1.0))
-            i_co.number_input("Comissão", format="%.1f", step=0.1, key=f"co_{uid}", on_change=atualizar_valores_uid, args=(
-                i, uid), label_visibility="collapsed")
+            i_co.number_input("Comissão", format="%.1f", step=0.1, key=f"co_{uid}", label_visibility="collapsed")
             p_co.button("➕", key=f"co_p_{uid}", type="tertiary",
                         on_click=step_value, args=(uid, 'co_', 1.0))
 
@@ -2093,8 +2119,7 @@ with tab1:
                 [0.7, 2.0, 0.7], gap="small", vertical_alignment="center")
             m_fl.button("➖", key=f"fl_m_{uid}", type="tertiary",
                         on_click=step_value, args=(uid, 'fl_', -1.0))
-            i_fl.number_input("Flex", format="%.1f", step=0.1, key=f"fl_{uid}", on_change=atualizar_valores_uid, args=(
-                i, uid), label_visibility="collapsed")
+            i_fl.number_input("Flex", format="%.1f", step=0.1, key=f"fl_{uid}", label_visibility="collapsed")
             p_fl.button("➕", key=f"fl_p_{uid}", type="tertiary",
                         on_click=step_value, args=(uid, 'fl_', 1.0))
 
@@ -2103,8 +2128,7 @@ with tab1:
                 [0.7, 2.0, 0.7], gap="small", vertical_alignment="center")
             m_de.button("➖", key=f"de_m_{uid}", type="tertiary",
                         on_click=step_value, args=(uid, 'de_', -1.0))
-            i_de.number_input("Desconto", format="%.1f", step=0.1, key=f"de_{uid}", on_change=atualizar_valores_uid, args=(
-                i, uid), label_visibility="collapsed")
+            i_de.number_input("Desconto", format="%.1f", step=0.1, key=f"de_{uid}", label_visibility="collapsed")
             p_de.button("➕", key=f"de_p_{uid}", type="tertiary",
                         on_click=step_value, args=(uid, 'de_', 1.0))
 
@@ -2113,10 +2137,10 @@ with tab1:
                 st.markdown("<div style='color:#10b981; font-size:11px; font-weight:800; text-align:center; line-height:1.2; margin-bottom:-5px; padding-top:10px'>com S.T<br>Não Calcular</div>", unsafe_allow_html=True)
             else:
                 st.markdown("<div style='color:#ef4444; font-size:11px; font-weight:800; text-align:center; line-height:1.2; margin-bottom:-5px; padding-top:10px'>sem S.T<br>CALCULAR</div>", unsafe_allow_html=True)
-            st.checkbox(
-                "+10.1%", key=f"im_{uid}", on_change=atualizar_valores_uid, args=(i, uid))
+            st.checkbox("+10.1%", key=f"im_{uid}")
 
         with c_fi:
+            atualizar_valores_uid(i, uid)
             st.write(f"**R$ {prod['Preço Final']:.2f}**")
 
         st.markdown("---")
