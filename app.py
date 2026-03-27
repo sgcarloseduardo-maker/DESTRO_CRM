@@ -1867,8 +1867,11 @@ with tab1:
                 unsafe_allow_html=True)
 
     img_idx_busca = obter_indice_imagens()
-    codigos_ja_selecionados = [p['Código']
-                               for p in st.session_state['produtos_selecionados']]
+    produtos_painel = st.session_state.get('produtos_selecionados', [])
+    if not isinstance(produtos_painel, list):
+        produtos_painel = []
+        st.session_state['produtos_selecionados'] = produtos_painel
+    codigos_ja_selecionados = [p['Código'] for p in produtos_painel]
 
     if not df_filtrado.empty:
         def formatar_opcao(x):
@@ -1900,11 +1903,11 @@ with tab1:
     num_produtos_atual = st.session_state.get("num_produtos_layout", 0)
     txt_limite = "Sem limite" if num_produtos_atual == 0 else f"{num_produtos_atual} espaços"
     st.markdown(
-        f"**Itens no painel:** {len(st.session_state['produtos_selecionados'])} / {txt_limite}")
+        f"**Itens no painel:** {len(produtos_painel)} / {txt_limite}")
     st.markdown("---")
     inicio, fim = 0, 0
 
-    if len(st.session_state['produtos_selecionados']) == 0:
+    if len(produtos_painel) == 0:
         st.info(
             "O painel está vazio. Busque e adicione produtos acima para montar seu encarte.")
     else:
@@ -1935,7 +1938,7 @@ with tab1:
             </style>
         """, unsafe_allow_html=True)
 
-        total_itens = len(st.session_state.produtos_selecionados)
+        total_itens = len(produtos_painel)
         col_nav_info, col_nav_size, col_nav_page = st.columns([2.2, 1.2, 1.2])
         with col_nav_info:
             st.caption(
@@ -1970,7 +1973,7 @@ with tab1:
         st.markdown("---")
 
     for i in range(inicio, fim):
-        prod = st.session_state.produtos_selecionados[i]
+        prod = produtos_painel[i]
         uid = prod['Código']
 
         # Garante que as variáveis de sessão essenciais existam antes de renderizar as colunas
@@ -2000,7 +2003,7 @@ with tab1:
             # Primeira linha de ações
             b1, b2, b3, b4 = st.columns([1.2, 1, 1, 1])
             with b1:
-                st.session_state.produtos_selecionados[i]['Levar'] = st.checkbox(
+                produtos_painel[i]['Levar'] = st.checkbox(
                     "Levar", key=f"chk_{uid}", label_visibility="collapsed")
             with b2:
                 if st.button("⬆️", key=f"up_{uid}", type="tertiary"):
