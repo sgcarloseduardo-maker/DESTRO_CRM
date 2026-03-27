@@ -1902,6 +1902,7 @@ with tab1:
     st.markdown(
         f"**Itens no painel:** {len(st.session_state['produtos_selecionados'])} / {txt_limite}")
     st.markdown("---")
+    inicio, fim = 0, 0
 
     if len(st.session_state['produtos_selecionados']) == 0:
         st.info(
@@ -1934,7 +1935,42 @@ with tab1:
             </style>
         """, unsafe_allow_html=True)
 
-    for i, prod in enumerate(st.session_state.produtos_selecionados):
+        total_itens = len(st.session_state.produtos_selecionados)
+        col_nav_info, col_nav_size, col_nav_page = st.columns([2.2, 1.2, 1.2])
+        with col_nav_info:
+            st.caption(
+                "Para melhorar desempenho, o painel exibe os itens por pagina.")
+        with col_nav_size:
+            itens_por_pagina = st.selectbox(
+                "Itens por pagina",
+                options=[25, 50, 100],
+                index=0,
+                key="itens_por_pagina_painel",
+            )
+
+        total_paginas = max(1, (total_itens + itens_por_pagina - 1) // itens_por_pagina)
+        pagina_inicial = st.session_state.get("pagina_painel_produtos", 1)
+        if pagina_inicial > total_paginas:
+            pagina_inicial = total_paginas
+        with col_nav_page:
+            pagina_atual = st.number_input(
+                "Pagina",
+                min_value=1,
+                max_value=total_paginas,
+                value=pagina_inicial,
+                step=1,
+                key="pagina_painel_produtos",
+            )
+
+        inicio = (pagina_atual - 1) * itens_por_pagina
+        fim = min(inicio + itens_por_pagina, total_itens)
+        st.caption(
+            f"Mostrando itens {inicio + 1} a {fim} de {total_itens} (pagina {pagina_atual}/{total_paginas})."
+        )
+        st.markdown("---")
+
+    for i in range(inicio, fim):
+        prod = st.session_state.produtos_selecionados[i]
         uid = prod['Código']
 
         # Garante que as variáveis de sessão essenciais existam antes de renderizar as colunas
@@ -1965,7 +2001,7 @@ with tab1:
             b1, b2, b3, b4 = st.columns([1.2, 1, 1, 1])
             with b1:
                 st.session_state.produtos_selecionados[i]['Levar'] = st.checkbox(
-                    "", key=f"chk_{uid}")
+                    "Levar", key=f"chk_{uid}", label_visibility="collapsed")
             with b2:
                 if st.button("⬆️", key=f"up_{uid}", type="tertiary"):
                     mover_cima(i)
@@ -1980,13 +2016,13 @@ with tab1:
             # Segunda linha de ações (Trocar/Subir imagem)
             if caminho_img and os.path.exists(caminho_img):
                 with st.popover("📤 Trocar", use_container_width=True):
-                    nova_img = st.file_uploader("", type=[
+                    nova_img = st.file_uploader("Upload de imagem", type=[
                                                 'png', 'jpg', 'jpeg', 'webp'], key=f"up_trocar_{uid}", label_visibility="collapsed")
                     if nova_img and st.button("Salvar Troca", key=f"btn_trocar_{uid}", type="primary"):
                         salvar_imagem_upload(nova_img, cod)
             else:
                 with st.popover("📤 Subir", use_container_width=True):
-                    nova_img = st.file_uploader("", type=[
+                    nova_img = st.file_uploader("Upload de imagem", type=[
                                                 'png', 'jpg', 'jpeg', 'webp'], key=f"up_novo_{uid}", label_visibility="collapsed")
                     if nova_img and st.button("Salvar Imagem", key=f"btn_novo_{uid}", type="primary"):
                         salvar_imagem_upload(nova_img, cod)
@@ -2036,7 +2072,7 @@ with tab1:
             st.write(f"**{prod['Descrição']}**")
 
         with c_pr:
-            st.number_input("", format="%.2f", step=None, key=f"pr_{uid}", on_change=atualizar_valores_uid, args=(
+            st.number_input("Preço atual", format="%.2f", step=None, key=f"pr_{uid}", on_change=atualizar_valores_uid, args=(
                 i, uid), label_visibility="collapsed")
 
         with c_co:
@@ -2044,7 +2080,7 @@ with tab1:
                 [0.7, 2.0, 0.7], gap="small", vertical_alignment="center")
             m_co.button("➖", key=f"co_m_{uid}", type="tertiary",
                         on_click=step_value, args=(uid, 'co_', -1.0))
-            i_co.number_input("", format="%.1f", step=0.1, key=f"co_{uid}", on_change=atualizar_valores_uid, args=(
+            i_co.number_input("Comissão", format="%.1f", step=0.1, key=f"co_{uid}", on_change=atualizar_valores_uid, args=(
                 i, uid), label_visibility="collapsed")
             p_co.button("➕", key=f"co_p_{uid}", type="tertiary",
                         on_click=step_value, args=(uid, 'co_', 1.0))
@@ -2054,7 +2090,7 @@ with tab1:
                 [0.7, 2.0, 0.7], gap="small", vertical_alignment="center")
             m_fl.button("➖", key=f"fl_m_{uid}", type="tertiary",
                         on_click=step_value, args=(uid, 'fl_', -1.0))
-            i_fl.number_input("", format="%.1f", step=0.1, key=f"fl_{uid}", on_change=atualizar_valores_uid, args=(
+            i_fl.number_input("Flex", format="%.1f", step=0.1, key=f"fl_{uid}", on_change=atualizar_valores_uid, args=(
                 i, uid), label_visibility="collapsed")
             p_fl.button("➕", key=f"fl_p_{uid}", type="tertiary",
                         on_click=step_value, args=(uid, 'fl_', 1.0))
@@ -2064,7 +2100,7 @@ with tab1:
                 [0.7, 2.0, 0.7], gap="small", vertical_alignment="center")
             m_de.button("➖", key=f"de_m_{uid}", type="tertiary",
                         on_click=step_value, args=(uid, 'de_', -1.0))
-            i_de.number_input("", format="%.1f", step=0.1, key=f"de_{uid}", on_change=atualizar_valores_uid, args=(
+            i_de.number_input("Desconto", format="%.1f", step=0.1, key=f"de_{uid}", on_change=atualizar_valores_uid, args=(
                 i, uid), label_visibility="collapsed")
             p_de.button("➕", key=f"de_p_{uid}", type="tertiary",
                         on_click=step_value, args=(uid, 'de_', 1.0))
