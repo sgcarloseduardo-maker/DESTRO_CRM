@@ -96,8 +96,8 @@ def load_crm_data(planilha_path: str) -> Tuple[pd.DataFrame, List[str], List[str
         return pd.DataFrame(), [], [], "PLANILHA_CORROMPIDA_OU_INVALIDA"
 
     try:
-        df_abc = pd.read_excel(
-            planilha_path, sheet_name="Curva ABC_Semanal", header=None, engine="openpyxl"
+        df_abc = excel_file.parse(
+            sheet_name="Curva ABC_Semanal", header=None
         )
         if 1 not in df_abc.columns:
             warnings.append("Aba 'Curva ABC_Semanal' sem coluna índice 1 esperada.")
@@ -125,8 +125,8 @@ def load_crm_data(planilha_path: str) -> Tuple[pd.DataFrame, List[str], List[str
         curva_abc_codigos = []
 
     try:
-        df_ind = pd.read_excel(
-            planilha_path, sheet_name="Industrias", skiprows=1, header=None, engine="openpyxl"
+        df_ind = excel_file.parse(
+            sheet_name="Industrias", skiprows=1, header=None
         )
         lista_industrias = sorted([i for i in df_ind[0].apply(_limpar_industria).dropna().unique() if i != ""])
     except Exception:
@@ -134,8 +134,8 @@ def load_crm_data(planilha_path: str) -> Tuple[pd.DataFrame, List[str], List[str
         warnings.append("Usando fallback de indústrias por falha na aba 'Industrias'.")
 
     try:
-        df_marcas = pd.read_excel(
-            planilha_path, sheet_name="Marcas", skiprows=1, header=None, engine="openpyxl"
+        df_marcas = excel_file.parse(
+            sheet_name="Marcas", skiprows=1, header=None
         )
         lista_marcas_reais = sorted(
             [m.strip() for m in df_marcas[0].dropna().astype(str) if m.strip().lower() != "nan" and m.strip() != ""]
@@ -154,7 +154,7 @@ def load_crm_data(planilha_path: str) -> Tuple[pd.DataFrame, List[str], List[str
         return "Outra Marca"
 
     try:
-        df_bateu = pd.read_excel(planilha_path, sheet_name="BateuLevou", engine="openpyxl")
+        df_bateu = excel_file.parse(sheet_name="BateuLevou")
         df_bateu["Desc_Norm"] = df_bateu["DESCRICAO"].astype(str).apply(lambda x: re.sub(r"\s+", " ", x.strip().upper()))
         dict_bateu_ind = df_bateu.set_index("Desc_Norm")["INDUSTRIA"].to_dict() if "INDUSTRIA" in df_bateu.columns else {}
         dict_bateu_mar = df_bateu.set_index("Desc_Norm")["MARCA"].to_dict() if "MARCA" in df_bateu.columns else {}
@@ -164,8 +164,8 @@ def load_crm_data(planilha_path: str) -> Tuple[pd.DataFrame, List[str], List[str
         warnings.append("Aba 'BateuLevou' indisponível; campanhas podem ficar incompletas.")
 
     try:
-        df = pd.read_excel(
-            planilha_path, sheet_name="Banco_Dados_Semanal", skiprows=5, header=None, engine="openpyxl"
+        df = excel_file.parse(
+            sheet_name="Banco_Dados_Semanal", skiprows=5, header=None
         )
         required_idx = [0, 1, 2, 5, 7, 9, 11]
         missing_idx = [idx for idx in required_idx if idx not in df.columns]
@@ -258,7 +258,7 @@ def load_crm_data(planilha_path: str) -> Tuple[pd.DataFrame, List[str], List[str
 
         codigos_podendo_exatos, codigos_podendo_parciais = set(), set()
         try:
-            df_podendo = pd.read_excel(planilha_path, sheet_name="TO PODENDO", header=None, engine="openpyxl")
+            df_podendo = excel_file.parse(sheet_name="TO PODENDO", header=None)
             for col in df_podendo.columns:
                 for val in df_podendo[col].dropna():
                     val_str = str(val).strip().upper()
@@ -294,7 +294,7 @@ def load_crm_data(planilha_path: str) -> Tuple[pd.DataFrame, List[str], List[str
 
         codigos_colgate_exatos, codigos_colgate_parciais = set(), set()
         try:
-            df_colgate = pd.read_excel(planilha_path, sheet_name="COLGATE", header=None, engine="openpyxl")
+            df_colgate = excel_file.parse(sheet_name="COLGATE", header=None)
             for col in df_colgate.columns:
                 for val in df_colgate[col].dropna():
                     val_str = str(val).strip().upper()
