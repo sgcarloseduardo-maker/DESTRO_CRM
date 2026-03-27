@@ -41,7 +41,7 @@ APP_VERSION = "2026.03.26.01"
 MAX_UPLOAD_IMAGE_MB = 10
 MAX_UPLOAD_PDF_MB = 20
 ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
-CACHE_TTL_SECONDS = 300
+CACHE_TTL_SECONDS = 21600
 
 logger = logging.getLogger(__name__)
 if not logger.handlers:
