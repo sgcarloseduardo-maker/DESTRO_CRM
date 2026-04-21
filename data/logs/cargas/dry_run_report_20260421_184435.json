@@ -1,0 +1,75 @@
+{
+  "file": "Banco do Dados.xlsx",
+  "dry_run": true,
+  "user": "operador",
+  "schema_version": "v1.0.0",
+  "warnings": [
+    "estoque_atual ausente; preenchido com 0."
+  ],
+  "would_change_files": [
+    "C:\\Users\\sgcar\\OneDrive\\Documentos\\GitHub\\DESTRO-CRM-ABRIL\\data\\staging\\semanal_staging.parquet",
+    "data\\staging\\semanal_anterior_staging.parquet",
+    "C:\\Users\\sgcar\\OneDrive\\Documentos\\GitHub\\DESTRO-CRM-ABRIL\\data\\curated\\produtos_curated.parquet",
+    "C:\\Users\\sgcar\\OneDrive\\Documentos\\GitHub\\DESTRO-CRM-ABRIL\\data\\curated\\campanhas_curated.parquet",
+    "C:\\Users\\sgcar\\OneDrive\\Documentos\\GitHub\\DESTRO-CRM-ABRIL\\data\\curated\\comparativo_semanal.parquet",
+    "C:\\Users\\sgcar\\OneDrive\\Documentos\\GitHub\\DESTRO-CRM-ABRIL\\data\\curated\\curated_app_ready.parquet"
+  ],
+  "reject_path": "",
+  "sha256": "1d283ed1491b89a6b2d8c9905f33c93e545a384d1891290d69755660a66e3831",
+  "detected_type": "semanal",
+  "scores": {
+    "semanal:Banco_Dados_Semanal": 0.8,
+    "semanal:Banco_Dados_S-1": 0.8,
+    "semanal:SellOut": 0.1222,
+    "semanal:BateuLevou": 0.2444,
+    "semanal:Colgate": 0.1,
+    "semanal:Curva ABC_Semanal": 0.2,
+    "abc:Banco_Dados_Semanal": 0.0,
+    "abc:Banco_Dados_S-1": 0.0,
+    "abc:SellOut": 0.0,
+    "abc:BateuLevou": 0.0,
+    "abc:Colgate": 0.0,
+    "abc:Curva ABC_Semanal": 0.14,
+    "campanhas:Banco_Dados_Semanal": 0.13,
+    "campanhas:Banco_Dados_S-1": 0.13,
+    "campanhas:SellOut": 0.0,
+    "campanhas:BateuLevou": 0.26,
+    "campanhas:Colgate": 0.33,
+    "campanhas:Curva ABC_Semanal": 0.0
+  },
+  "winning_sheet": "Banco_Dados_Semanal",
+  "confidence": 0.8,
+  "confidence_band": "auto",
+  "mapped_columns": {
+    "codigo_destro": "Codigo",
+    "descricao_produto": "Descricao do Produto",
+    "preco_7": "A Vista",
+    "preco_14": "14 Dias",
+    "preco_21": "21 Dias",
+    "preco_28": "28 Dias",
+    "ean": "C¢dido de Barras"
+  },
+  "promotion": {
+    "domain": "semanal",
+    "promoted_to": "C:\\Users\\sgcar\\OneDrive\\Documentos\\GitHub\\DESTRO-CRM-ABRIL\\data\\input\\semanal\\atual\\Banco do Dados.xlsx",
+    "moved_previous": false,
+    "archived_current": false,
+    "rollback": false,
+    "had_previous_current": true,
+    "restored_state": "dry_run"
+  },
+  "staging": {
+    "path": "C:\\Users\\sgcar\\OneDrive\\Documentos\\GitHub\\DESTRO-CRM-ABRIL\\data\\staging\\semanal_staging.parquet",
+    "domain": "semanal",
+    "rows": "5483",
+    "source_file": "Banco do Dados.xlsx"
+  },
+  "curated_outputs": {
+    "curated_produtos": "C:\\Users\\sgcar\\OneDrive\\Documentos\\GitHub\\DESTRO-CRM-ABRIL\\data\\curated\\produtos_curated.parquet",
+    "curated_campanhas": "C:\\Users\\sgcar\\OneDrive\\Documentos\\GitHub\\DESTRO-CRM-ABRIL\\data\\curated\\campanhas_curated.parquet",
+    "curated_comparativo_semanal": "C:\\Users\\sgcar\\OneDrive\\Documentos\\GitHub\\DESTRO-CRM-ABRIL\\data\\curated\\comparativo_semanal.parquet",
+    "curated_app_ready": "C:\\Users\\sgcar\\OneDrive\\Documentos\\GitHub\\DESTRO-CRM-ABRIL\\data\\curated\\curated_app_ready.parquet"
+  },
+  "decision": "accepted_dry_run",
+  "reason": "ok"
+}
