@@ -4,3 +4,9 @@ __pycache__/
 *.pyd
 .env
 .streamlit_upload_temp/
+
+# Runtime data artifacts
+data/input/
+data/staging/
+data/curated/
+data/logs/cargas/*.json
